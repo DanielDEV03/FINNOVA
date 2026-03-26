@@ -157,10 +157,8 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-        Console.WriteLine($"🔍 ConnectionString length: {connectionString?.Length ?? 0}");
-        Console.WriteLine($"🔍 ConnectionString (first 50 chars): {(connectionString != null && connectionString.Length > 0 ? connectionString.Substring(0, Math.Min(50, connectionString.Length)) : "null")}");
-        Console.WriteLine($"🔍 ConnectionString (full): {connectionString}");
-        
+        Console.WriteLine($"🔍 ConnectionString configured: {!string.IsNullOrEmpty(connectionString)}");
+
         if (string.IsNullOrEmpty(connectionString))
         {
             Console.WriteLine("❌ ERROR: ConnectionString is null or empty!");

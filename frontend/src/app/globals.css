@@ -2,17 +2,142 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Light mode tokens ── */
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --bg: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --border: rgba(0, 0, 0, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #10b981;
+  --accent-dim: rgba(16, 185, 129, 0.12);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Dark mode tokens ── */
+.dark {
+  --bg: #030712;
+  --bg-card: #0a1628;
+  --bg-card-hover: #0f1f38;
+  --border: rgba(255, 255, 255, 0.07);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --accent: #10b981;
+  --accent-dim: rgba(16, 185, 129, 0.15);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))) rgb(var(--background-start-rgb));
+  background-color: var(--bg);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar dark mode ── */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0a1628;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.3);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.5);
+}
+
+/* ── Utility classes ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 0.75rem;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.dark .card {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+/* ── Input dark mode ── */
+.dark input,
+.dark select,
+.dark textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  outline: none;
+}
+
+/* ── Table dark mode ── */
+.dark table {
+  color: var(--text-primary);
+}
+
+.dark thead {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.dark thead th {
+  color: var(--accent);
+  border-color: var(--border);
+}
+
+.dark tbody tr {
+  border-color: var(--border);
+}
+
+.dark tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Badge / chip ── */
+.dark .badge-green {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.dark .badge-red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.dark .badge-yellow {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
 }
 
 /* Animaciones de Gamificación */
@@ -70,4 +195,97 @@ body {
 
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Gamification animations (legacy compat) ── */
+@keyframes confetti {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  100% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-confetti {
+  animation: confetti linear forwards;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ── Dark mode card overrides ── */
+.dark .bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.dark .border-gray-200 {
+  border-color: var(--border) !important;
+}
+
+.dark .border-gray-300 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .text-gray-800,
+.dark .text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-gray-600,
+.dark .text-gray-700 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-gray-400,
+.dark .text-gray-500 {
+  color: var(--text-muted) !important;
+}
+
+.dark .shadow-lg,
+.dark .shadow-md,
+.dark .shadow {
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* ── Recharts dark mode ── */
+.dark .recharts-cartesian-grid-horizontal line,
+.dark .recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.dark .recharts-text {
+  fill: #94a3b8;
+}
+
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #0a1628 !important;
+  border: 1px solid rgba(16, 185, 129, 0.2) !important;
+  border-radius: 8px;
 }

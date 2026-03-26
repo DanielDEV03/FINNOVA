@@ -13,6 +13,13 @@ backend/.env
 frontend/.env.local
 frontend/.env.production
 
+# appsettings con secretos reales (solo el .example se sube)
+backend/src/**/appsettings.Development.json
+backend/src/**/appsettings.Secrets.json
+
+# Secrets de usuario de .NET
+**/secrets.json
+
 # Node modules
 node_modules/
 frontend/node_modules/

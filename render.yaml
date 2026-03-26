@@ -1,5 +1,5 @@
 services:
-  # Backend .NET API
+  # ── Backend .NET API ──────────────────────────────────────────────────────
   - type: web
     name: finnova-backend
     runtime: docker
@@ -24,24 +24,18 @@ services:
         value: https://finnova-ai.onrender.com
       - key: AiEngine__ApiKey
         generateValue: true
+      # Email — configurar manualmente en Render dashboard (no hardcodear aquí)
       - key: Email__SmtpHost
         value: smtp.gmail.com
       - key: Email__SmtpPort
         value: "587"
-      - key: Email__SmtpUser
-        value: ctslabscartagena@gmail.com
-      - key: Email__SmtpPassword
-        value: vxwjofchoiicrqeh
       - key: Email__FromName
         value: FINNOVA
-      - key: Email__FromEmail
-        value: ctslabscartagena@gmail.com
-      - key: AdminBootstrap__Email
-        value: ctslabscartagena@gmail.com
-      - key: AdminBootstrap__Password
-        value: Finnova2026!
+      # Email__SmtpUser, Email__SmtpPassword, Email__FromEmail → configurar en Render dashboard
+      # AdminBootstrap__Email, AdminBootstrap__Password → configurar en Render dashboard,
+      #   eliminar después del primer deploy exitoso
 
-  # AI Engine Python
+  # ── AI Engine Python/FastAPI ──────────────────────────────────────────────
   - type: web
     name: finnova-ai
     runtime: docker
@@ -49,14 +43,14 @@ services:
     dockerContext: ./ai-engine
     envVars:
       - key: PORT
-        value: 8000
+        value: "8000"
       - key: AI_ENGINE_API_KEY
         fromService:
           name: finnova-backend
           type: web
           envVarKey: AiEngine__ApiKey
 
-  # Frontend Next.js
+  # ── Frontend Next.js ──────────────────────────────────────────────────────
   - type: web
     name: finnova-frontend
     runtime: docker
@@ -68,8 +62,6 @@ services:
     envVars:
       - key: NEXT_PUBLIC_API_URL
         value: https://finnova-backend.onrender.com/api
-      - key: NODE_VERSION
-        value: "20"
 
 databases:
   - name: finnova-db

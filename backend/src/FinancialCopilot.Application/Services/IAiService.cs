@@ -24,9 +24,20 @@ public record MonthlyPrediction(
 );
 
 public record ExpensePredictionDto(
-    Dictionary<string, CategoryPrediction> CategoryPredictions
+    List<CategoryPredictionItem> Predictions,
+    decimal TotalPredicted,
+    double Confidence,
+    List<string> Recommendations
 );
 
+public record CategoryPredictionItem(
+    string Category,
+    decimal PredictedAmount,
+    double Confidence,
+    string Trend
+);
+
+// kept for internal use
 public record CategoryPrediction(
     decimal Average,
     decimal PredictedNextMonth,

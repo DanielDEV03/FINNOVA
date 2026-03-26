@@ -33,7 +33,7 @@ services:
       - Jwt__Key=${JWT_KEY:-tu-secreto-super-seguro-de-al-menos-256-bits-para-desarrollo-local}
       - Jwt__Issuer=FinancialCopilot
       - Jwt__Audience=FinancialCopilotUsers
-      - AiEngine__Url=http://ai-engine:8000
+      - AiEngine__Url=http://ai-engine:8001
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,9 +46,9 @@ services:
       dockerfile: Dockerfile
     container_name: financialcopilot-ai
     ports:
-      - "8000:8000"
+      - "8001:8001"
     environment:
-      - PORT=8000
+      - PORT=8001
     restart: unless-stopped
 
   # Frontend Next.js

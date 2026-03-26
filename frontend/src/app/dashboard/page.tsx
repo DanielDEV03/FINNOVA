@@ -7,6 +7,8 @@ import Link from 'next/link'
 import GamificationWidget from '@/components/gamification/GamificationWidget'
 import AchievementToast from '@/components/gamification/AchievementToast'
 import { useAppTour } from '@/components/AppTour'
+import NotificationBell from '@/components/NotificationBell'
+import { exportFinancialReport } from '@/lib/exportPDF'
 
 const formatCOP = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -132,11 +134,30 @@ export default function Dashboard() {
                 onClose={() => setNewAchievement(null)}
             />
 
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-3 sm:p-4 md:p-8">
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 p-3 sm:p-4 md:p-8">
                 <div className="w-full max-w-7xl mx-auto">
-                    <div className="mb-6 md:mb-8" id="dashboard-title">
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">💼 Dashboard Financiero</h1>
-                        <p className="text-sm sm:text-base text-gray-600 mt-1 md:mt-2">Resumen de tu situación financiera</p>
+                    <div className="mb-6 md:mb-8 flex items-start justify-between" id="dashboard-title">
+                        <div>
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">💼 Dashboard Financiero</h1>
+                            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1 md:mt-2">Resumen de tu situación financiera</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <NotificationBell />
+                            <button
+                                onClick={() => data && exportFinancialReport({
+                                    userName: localStorage.getItem('userName') || 'Usuario',
+                                    totalIncome: data.totalIncome,
+                                    totalExpenses: data.totalExpenses,
+                                    balance: data.balance,
+                                    totalDebt: data.totalDebt,
+                                    transactions: data.recentTransactions
+                                })}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-all hover:scale-105"
+                                style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
+                                title="Exportar reporte PDF">
+                                📄 PDF
+                            </button>
+                        </div>
                     </div>
 
                     {/* GAMIFICACIÓN WIDGET */}

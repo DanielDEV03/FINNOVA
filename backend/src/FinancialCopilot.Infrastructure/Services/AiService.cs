@@ -87,16 +87,22 @@ public class AiService : IAiService
         if (result == null)
             throw new Exception("Failed to get expense prediction from AI engine");
 
-        var categoryPredictions = result.CategoryPredictions.ToDictionary(
-            kvp => kvp.Key,
-            kvp => new CategoryPrediction(
-                (decimal)kvp.Value.Average,
-                (decimal)kvp.Value.PredictedNextMonth,
-                kvp.Value.Trend
-            )
-        );
+        var predictions = result.CategoryPredictions.Select(kvp => new CategoryPredictionItem(
+            kvp.Key,
+            (decimal)kvp.Value.PredictedNextMonth * monthsAhead,
+            0.6,
+            kvp.Value.Trend
+        )).ToList();
 
-        return new ExpensePredictionDto(categoryPredictions);
+        var total = predictions.Sum(p => p.PredictedAmount);
+        var confidence = predictions.Count > 0 ? 0.6 : 0.3;
+        var recommendations = new List<string>();
+        if (predictions.Count == 0)
+            recommendations.Add("Registra más gastos para obtener predicciones por categoría.");
+        else
+            recommendations.Add($"Se predicen {predictions.Count} categorías de gasto para los próximos {monthsAhead} meses.");
+
+        return new ExpensePredictionDto(predictions, total, confidence, recommendations);
     }
 
     public async Task<SimulationResultDto> SimulateScenarios(Guid userId, int months = 12)
@@ -246,14 +252,14 @@ public class AiService : IAiService
             throw new Exception("Failed to get risk analysis from AI engine");
 
         return new RiskAnalysisDto(
-            result.RiskScore,
-            result.RiskLevel,
+            result.GetRiskScore(),
+            result.GetRiskLevel(),
             result.Factors,
             result.Recommendations,
             new RiskMetrics(
-                result.Metrics.ExpenseRatio,
-                result.Metrics.Volatility,
-                (decimal)result.Metrics.Balance
+                result.GetExpenseRatio(),
+                result.GetVolatility(),
+                (decimal)result.GetBalance()
             )
         );
     }
@@ -373,9 +379,8 @@ public class AiService : IAiService
 
         if (endpoint == "/predict/balance")
         {
-            // Calcular predicciones básicas con los datos de transacciones
             double totalIncome = 0, totalExpenses = 0;
-            int txCount = 0;
+            var monthSet = new HashSet<string>();
             try
             {
                 var root = doc.RootElement;
@@ -385,37 +390,43 @@ public class AiService : IAiService
                     {
                         var amount = tx.TryGetProperty("amount", out var a) ? a.GetDouble() : 0;
                         var type = tx.TryGetProperty("type", out var t) ? t.GetString() : "";
+                        var date = tx.TryGetProperty("date", out var d) ? d.GetString() ?? "" : "";
+                        if (date.Length >= 7) monthSet.Add(date.Substring(0, 7));
                         if (type == "income") totalIncome += amount;
                         else totalExpenses += amount;
-                        txCount++;
                     }
                 }
             }
             catch { }
 
             var balance = totalIncome - totalExpenses;
+            var monthCount = Math.Max(1, monthSet.Count);
             var monthsAhead = 3;
             try { if (doc.RootElement.TryGetProperty("months_ahead", out var ma)) monthsAhead = ma.GetInt32(); } catch { }
 
-            var avgMonthlyNet = txCount > 0 ? (totalIncome - totalExpenses) / Math.Max(1, txCount / 10.0) : 0;
+            var avgMonthlyIncome = totalIncome / monthCount;
+            var avgMonthlyExpenses = totalExpenses / monthCount;
+            var avgMonthlyNet = avgMonthlyIncome - avgMonthlyExpenses;
+            var confidence = monthCount >= 6 ? 0.9 : monthCount >= 3 ? 0.7 : monthCount >= 2 ? 0.6 : 0.5;
+
             var predictions = Enumerable.Range(1, monthsAhead).Select(i => new
             {
                 month = DateTime.UtcNow.AddMonths(i).ToString("yyyy-MM"),
                 predicted_balance = Math.Round(balance + avgMonthlyNet * i, 2),
-                confidence = 0.6
+                confidence
             }).ToList();
 
             var predictResult = new
             {
                 predictions,
-                confidence = 0.6,
+                confidence,
                 trend = avgMonthlyNet >= 0 ? "increasing" : "decreasing",
                 risk_level = balance < 0 ? "high" : avgMonthlyNet < 0 ? "medium" : "low",
                 recommendations = new[]
                 {
-                    balance < 0 ? "Tu balance es negativo. Prioriza reducir gastos." : "Mantén tus hábitos de ahorro.",
-                    avgMonthlyNet < 0 ? "Tus gastos superan tus ingresos. Revisa tu presupuesto." : $"Ahorras aproximadamente {avgMonthlyNet:N0} COP/mes.",
-                    "Registra más transacciones para predicciones más precisas."
+                    balance < 0 ? "Tu balance es negativo. Prioriza reducir gastos." : $"Balance actual: {balance:N0} COP.",
+                    avgMonthlyNet < 0 ? $"Gastas {Math.Abs(avgMonthlyNet):N0} COP más de lo que ingresas por mes." : $"Ahorras {avgMonthlyNet:N0} COP/mes en promedio.",
+                    monthCount < 3 ? "Registra más meses para predicciones más precisas." : "Buen historial de datos."
                 },
                 current_balance = Math.Round(balance, 2)
             };
@@ -425,6 +436,7 @@ public class AiService : IAiService
         if (endpoint == "/analyze/risk")
         {
             double totalInc = 0, totalExp = 0;
+            var monthlyExpMap = new Dictionary<string, double>();
             try
             {
                 var root = doc.RootElement;
@@ -433,22 +445,38 @@ public class AiService : IAiService
                     {
                         var amount = tx.TryGetProperty("amount", out var a) ? a.GetDouble() : 0;
                         var type = tx.TryGetProperty("type", out var t) ? t.GetString() : "";
+                        var date = tx.TryGetProperty("date", out var d) ? d.GetString() ?? "" : "";
+                        var month = date.Length >= 7 ? date.Substring(0, 7) : "unknown";
                         if (type == "income") totalInc += amount;
-                        else totalExp += amount;
+                        else
+                        {
+                            totalExp += amount;
+                            if (!monthlyExpMap.ContainsKey(month)) monthlyExpMap[month] = 0;
+                            monthlyExpMap[month] += amount;
+                        }
                     }
             }
             catch { }
 
-            var expenseRatio = totalInc > 0 ? totalExp / totalInc : 1.0;
+            var expenseRatio = totalInc > 0 ? totalExp / totalInc : (totalExp > 0 ? 1.0 : 0.0);
             var riskScore = expenseRatio > 0.9 ? 70 : expenseRatio > 0.7 ? 40 : 20;
             var riskLevel = riskScore >= 70 ? "high" : riskScore >= 40 ? "medium" : "low";
+
+            // Calcular volatilidad real
+            double volatility = 0;
+            if (monthlyExpMap.Count > 1)
+            {
+                var vals = monthlyExpMap.Values.ToList();
+                var avg = vals.Average();
+                volatility = avg > 0 ? Math.Sqrt(vals.Sum(v => Math.Pow(v - avg, 2)) / vals.Count) / avg : 0;
+            }
 
             var riskResult = new
             {
                 risk_score = riskScore,
                 risk_level = riskLevel,
                 factors = expenseRatio > 0.8
-                    ? new[] { "Gastos elevados respecto a ingresos" }
+                    ? new[] { "Alta volatilidad en gastos", "Gastos concentrados en pocas categorías", "Gastos inconsistentes" }
                     : new[] { "Situación financiera estable" },
                 recommendations = new[]
                 {
@@ -458,11 +486,41 @@ public class AiService : IAiService
                 metrics = new
                 {
                     expense_ratio = Math.Round(expenseRatio, 3),
-                    volatility = 0.1,
+                    volatility = Math.Round(volatility, 3),
                     balance = Math.Round(totalInc - totalExp, 2)
                 }
             };
             return JsonSerializer.Serialize(riskResult);
+        }
+
+        if (endpoint == "/predict/expenses")
+        {
+            var categoryMap = new Dictionary<string, (double total, int count)>();
+            try
+            {
+                var root = doc.RootElement;
+                if (root.TryGetProperty("transactions", out var txs))
+                    foreach (var tx in txs.EnumerateArray())
+                    {
+                        var amount = tx.TryGetProperty("amount", out var a) ? a.GetDouble() : 0;
+                        var cat = tx.TryGetProperty("category", out var c) ? c.GetString() ?? "Otros" : "Otros";
+                        if (!categoryMap.ContainsKey(cat)) categoryMap[cat] = (0, 0);
+                        categoryMap[cat] = (categoryMap[cat].total + amount, categoryMap[cat].count + 1);
+                    }
+            }
+            catch { }
+
+            var catPredictions = categoryMap.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (object)new
+                {
+                    average = Math.Round(kvp.Value.total / Math.Max(1, kvp.Value.count), 2),
+                    predicted_next_month = Math.Round(kvp.Value.total / Math.Max(1, kvp.Value.count), 2),
+                    trend = "stable"
+                }
+            );
+
+            return JsonSerializer.Serialize(new { category_predictions = catPredictions });
         }
 
         return @"{""error"": ""AI Engine unavailable"", ""message"": ""Using fallback data""}";
@@ -527,30 +585,52 @@ public class AiService : IAiService
 
     private class AiBalancePredictionResponse
     {
+        [JsonPropertyName("predictions")]
         public List<AiMonthlyPrediction> Predictions { get; set; } = new();
+
+        [JsonPropertyName("confidence")]
         public double Confidence { get; set; }
+
+        [JsonPropertyName("trend")]
         public string Trend { get; set; } = string.Empty;
+
+        [JsonPropertyName("risk_level")]
         public string RiskLevel { get; set; } = string.Empty;
+
+        [JsonPropertyName("recommendations")]
         public List<string> Recommendations { get; set; } = new();
+
+        [JsonPropertyName("current_balance")]
         public double CurrentBalance { get; set; }
     }
 
     private class AiMonthlyPrediction
     {
+        [JsonPropertyName("month")]
         public string Month { get; set; } = string.Empty;
+
+        [JsonPropertyName("predicted_balance")]
         public double PredictedBalance { get; set; }
+
+        [JsonPropertyName("confidence")]
         public double Confidence { get; set; }
     }
 
     private class AiExpensePredictionResponse
     {
+        [JsonPropertyName("category_predictions")]
         public Dictionary<string, AiCategoryPrediction> CategoryPredictions { get; set; } = new();
     }
 
     private class AiCategoryPrediction
     {
+        [JsonPropertyName("average")]
         public double Average { get; set; }
+
+        [JsonPropertyName("predicted_next_month")]
         public double PredictedNextMonth { get; set; }
+
+        [JsonPropertyName("trend")]
         public string Trend { get; set; } = string.Empty;
     }
 
@@ -625,11 +705,58 @@ public class AiService : IAiService
 
     private class AiRiskAnalysisResponse
     {
+        [JsonPropertyName("health_score")]
+        public int HealthScore { get; set; }
+
+        [JsonPropertyName("risk_score")]
         public int RiskScore { get; set; }
+
+        [JsonPropertyName("health_level")]
+        public string HealthLevel { get; set; } = string.Empty;
+
+        [JsonPropertyName("risk_level")]
         public string RiskLevel { get; set; } = string.Empty;
+
         public List<string> Factors { get; set; } = new();
         public List<string> Recommendations { get; set; } = new();
-        public AiRiskMetrics Metrics { get; set; } = new();
+
+        [JsonPropertyName("key_metrics")]
+        public AiKeyMetrics? KeyMetrics { get; set; }
+
+        public AiRiskMetrics? Metrics { get; set; }
+
+        // Helpers para unificar ambos formatos
+        public int GetRiskScore() => RiskScore > 0 ? RiskScore : (100 - HealthScore);
+        public string GetRiskLevel()
+        {
+            if (!string.IsNullOrEmpty(RiskLevel)) return RiskLevel;
+            return HealthLevel switch
+            {
+                "excellent" => "low",
+                "good" => "low",
+                "fair" => "medium",
+                "poor" => "high",
+                _ => "medium"
+            };
+        }
+        public double GetExpenseRatio() => KeyMetrics?.ExpenseRatio ?? Metrics?.ExpenseRatio ?? 0;
+        public double GetVolatility() => KeyMetrics?.ExpenseVolatility ?? Metrics?.Volatility ?? 0;
+        public double GetBalance() => Metrics?.Balance ?? 0;
+    }
+
+    private class AiKeyMetrics
+    {
+        [JsonPropertyName("expense_ratio")]
+        public double ExpenseRatio { get; set; }
+
+        [JsonPropertyName("savings_rate")]
+        public double SavingsRate { get; set; }
+
+        [JsonPropertyName("expense_volatility")]
+        public double ExpenseVolatility { get; set; }
+
+        [JsonPropertyName("category_diversity")]
+        public double CategoryDiversity { get; set; }
     }
 
     private class AiRiskMetrics
