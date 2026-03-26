@@ -218,36 +218,83 @@ export default function LandingPage() {
 
                     {/* Dashboard preview */}
                     <div className="mt-16 animate-slide-up" style={{ animationDelay: '0.5s' }}>
-                        <div className="glass rounded-3xl p-6 md:p-8 max-w-3xl mx-auto glow-green">
-                            {/* Barra de título falsa */}
-                            <div className="flex items-center gap-2 mb-6">
-                                <div className="w-3 h-3 rounded-full bg-red-500/70" />
-                                <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
-                                <div className="w-3 h-3 rounded-full bg-emerald-500/70" />
-                                <div className="flex-1 mx-4 h-6 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                                    <div className="text-xs text-gray-600 text-center leading-6">finnova.app/dashboard</div>
+                        <div className="max-w-3xl mx-auto rounded-2xl overflow-hidden"
+                            style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 0 80px rgba(16,185,129,0.15), 0 40px 80px rgba(0,0,0,0.6)' }}>
+
+                            {/* Barra de título */}
+                            <div className="flex items-center gap-2 px-4 py-3"
+                                style={{ background: '#161b22', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div className="w-3 h-3 rounded-full" style={{ background: '#ff5f57' }} />
+                                <div className="w-3 h-3 rounded-full" style={{ background: '#febc2e' }} />
+                                <div className="w-3 h-3 rounded-full" style={{ background: '#28c840' }} />
+                                <div className="flex-1 mx-3 h-6 rounded-md flex items-center justify-center"
+                                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <span className="text-xs text-gray-500">finnova.app/dashboard</span>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                {[
-                                    { label: 'Balance Total', value: '$8,450,000', change: '↑ +12% este mes', icon: '💰', color: 'from-emerald-500/20 to-teal-500/20', border: 'border-emerald-500/20' },
-                                    { label: 'Predicción IA', value: '$9,200,000', change: 'En 3 meses', icon: '🔮', color: 'from-violet-500/20 to-purple-500/20', border: 'border-violet-500/20' },
-                                    { label: 'Ahorro Sugerido', value: '$750,000', change: 'Por mes', icon: '🎯', color: 'from-blue-500/20 to-cyan-500/20', border: 'border-blue-500/20' },
-                                ].map(card => (
-                                    <div key={card.label} className={`bg-gradient-to-br ${card.color} rounded-2xl p-5 border ${card.border}`}>
-                                        <div className="text-2xl mb-2">{card.icon}</div>
-                                        <div className="text-xs text-gray-400 mb-1">{card.label}</div>
-                                        <div className="text-xl font-black text-white">{card.value}</div>
-                                        <div className="text-xs text-emerald-400 mt-1">{card.change}</div>
+
+                            {/* Contenido del dashboard */}
+                            <div className="p-5 md:p-7">
+                                {/* Cards principales */}
+                                <div className="grid grid-cols-3 gap-3 md:gap-4 mb-5">
+                                    {[
+                                        {
+                                            label: 'Balance Total',
+                                            value: '$8,450,000',
+                                            change: '↑ +12% este mes',
+                                            icon: '💰',
+                                            bg: 'rgba(16,185,129,0.12)',
+                                            border: 'rgba(16,185,129,0.25)',
+                                            changeColor: '#10b981'
+                                        },
+                                        {
+                                            label: 'Predicción IA',
+                                            value: '$9,200,000',
+                                            change: 'En 3 meses',
+                                            icon: '🔮',
+                                            bg: 'rgba(139,92,246,0.12)',
+                                            border: 'rgba(139,92,246,0.25)',
+                                            changeColor: '#a78bfa'
+                                        },
+                                        {
+                                            label: 'Ahorro Sugerido',
+                                            value: '$750,000',
+                                            change: 'Por mes',
+                                            icon: '🎯',
+                                            bg: 'rgba(59,130,246,0.12)',
+                                            border: 'rgba(59,130,246,0.2)',
+                                            changeColor: '#60a5fa'
+                                        },
+                                    ].map(card => (
+                                        <div key={card.label} className="rounded-xl p-4 md:p-5 flex flex-col"
+                                            style={{ background: card.bg, border: `1px solid ${card.border}` }}>
+                                            <div className="text-2xl md:text-3xl mb-3">{card.icon}</div>
+                                            <div className="text-xs text-gray-400 mb-1.5">{card.label}</div>
+                                            <div className="text-base md:text-xl font-black text-white leading-tight">{card.value}</div>
+                                            <div className="text-xs mt-1.5 font-medium" style={{ color: card.changeColor }}>{card.change}</div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Gráfica de barras */}
+                                <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs text-gray-500 font-medium">Actividad financiera</span>
+                                        <span className="text-xs text-emerald-400">↑ Tendencia positiva</span>
                                     </div>
-                                ))}
-                            </div>
-                            {/* Mini gráfica decorativa */}
-                            <div className="mt-4 flex items-end gap-1 h-12 px-2">
-                                {[40, 65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 100].map((h, i) => (
-                                    <div key={i} className="flex-1 rounded-t transition-all duration-500"
-                                        style={{ height: `${h}%`, background: `rgba(16,185,129,${0.2 + (i / 12) * 0.6})` }} />
-                                ))}
+                                    <div className="flex items-end gap-1 h-14">
+                                        {[30, 50, 38, 65, 45, 72, 55, 80, 62, 88, 70, 100].map((h, i) => (
+                                            <div key={i} className="flex-1 rounded-sm"
+                                                style={{
+                                                    height: `${h}%`,
+                                                    background: i === 11
+                                                        ? '#10b981'
+                                                        : `rgba(16,185,129,${0.15 + (i / 12) * 0.45})`,
+                                                    transition: 'height 0.5s ease'
+                                                }} />
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
