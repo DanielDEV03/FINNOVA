@@ -6,6 +6,11 @@ import ThemeInit from '@/components/ThemeInit'
 export const metadata: Metadata = {
     title: 'FINNOVA - Tu Copiloto Financiero',
     description: 'Tu copiloto financiero inteligente impulsado por IA',
+    icons: {
+        icon: '/favicon.svg',
+        shortcut: '/favicon.svg',
+        apple: '/favicon.svg',
+    },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
