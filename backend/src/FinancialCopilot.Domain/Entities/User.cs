@@ -7,6 +7,13 @@ public class User
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string Role { get; set; } = "user"; // user | admin | support
+
+    // Subscription
+    public string Plan { get; set; } = "free";          // free | pro | business
+    public DateTime? PlanExpiresAt { get; set; }
+
+    public bool IsPro => Plan is "pro" or "business" && (PlanExpiresAt == null || PlanExpiresAt > DateTime.UtcNow);
+    public bool IsBusiness => Plan == "business" && (PlanExpiresAt == null || PlanExpiresAt > DateTime.UtcNow);
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 

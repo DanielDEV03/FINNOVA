@@ -5,10 +5,13 @@ import { useState } from 'react'
 import Logo from './Logo'
 import { logout } from '@/lib/auth'
 import ThemeToggle from './ThemeToggle'
+import { usePlan } from '@/hooks/usePlan'
+import { getPlanLabel, getPlanColor } from '@/lib/subscription'
 
 export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const isAdmin = typeof window !== 'undefined' && localStorage.getItem('userRole') === 'admin'
+    const { plan, isPro } = usePlan()
 
     const navLink = "text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium transition text-sm"
     const mobileLink = "px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-lg transition"
@@ -36,6 +39,13 @@ export default function Navbar() {
                         {isAdmin && (
                             <Link href="/admin" className="text-red-500 hover:text-red-400 font-bold text-sm transition">🛡️ Admin</Link>
                         )}
+                        {/* Plan badge */}
+                        <Link href="/pricing" className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-all hover:scale-105 ${isPro
+                                ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                                : 'text-gray-500 border-gray-600/40 bg-gray-800/40 hover:text-emerald-400'
+                            }`}>
+                            {getPlanLabel(plan)}
+                        </Link>
                         <ThemeToggle />
                         <button onClick={logout} className="text-sm text-red-500 hover:text-red-400 font-semibold transition">
                             Salir

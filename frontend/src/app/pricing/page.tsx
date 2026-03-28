@@ -3,95 +3,102 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
+import { createCheckout } from '@/lib/subscription'
+import { usePlan } from '@/hooks/usePlan'
 
 const plans = [
     {
+        id: 'free',
         name: 'Gratis',
-        price: 0,
-        period: 'siempre',
+        price: { monthly: 0, annual: 0 },
         description: 'Para empezar a controlar tus finanzas',
-        color: 'from-gray-700 to-gray-800',
-        border: 'border-gray-700',
         badge: null,
+        popular: false,
         features: [
-            '✅ Dashboard financiero',
-            '✅ Hasta 50 transacciones/mes',
-            '✅ Predicciones básicas IA',
-            '✅ 1 simulación de escenarios',
-            '✅ Alertas básicas',
-            '❌ Exportar PDF',
-            '❌ Análisis avanzado',
-            '❌ Notificaciones push',
-            '❌ Soporte prioritario',
+            { label: 'Dashboard financiero', included: true },
+            { label: 'Hasta 50 transacciones/mes', included: true },
+            { label: 'Predicciones básicas IA', included: true },
+            { label: '1 simulación de escenarios', included: true },
+            { label: 'Alertas básicas', included: true },
+            { label: 'Exportar PDF', included: false },
+            { label: 'Análisis avanzado', included: false },
+            { label: 'Notificaciones push', included: false },
+            { label: 'Soporte prioritario', included: false },
         ],
-        cta: 'Comenzar Gratis',
-        ctaHref: '/auth/register',
-        ctaStyle: 'bg-gray-700 hover:bg-gray-600 text-white',
     },
     {
+        id: 'pro',
         name: 'Pro',
-        price: 29900,
-        period: 'mes',
+        price: { monthly: 29_900, annual: 287_040 },
         description: 'Para quienes toman sus finanzas en serio',
-        color: 'from-emerald-600 to-teal-600',
-        border: 'border-emerald-500',
         badge: '⭐ Más popular',
+        popular: true,
         features: [
-            '✅ Todo lo del plan Gratis',
-            '✅ Transacciones ilimitadas',
-            '✅ Predicciones IA avanzadas',
-            '✅ Simulaciones ilimitadas',
-            '✅ Exportar reportes PDF',
-            '✅ Análisis detallado',
-            '✅ Notificaciones push',
-            '✅ Alertas inteligentes',
-            '❌ Soporte prioritario',
+            { label: 'Todo lo del plan Gratis', included: true },
+            { label: 'Transacciones ilimitadas', included: true },
+            { label: 'Predicciones IA avanzadas', included: true },
+            { label: 'Simulaciones ilimitadas', included: true },
+            { label: 'Exportar reportes PDF', included: true },
+            { label: 'Análisis detallado', included: true },
+            { label: 'Notificaciones push', included: true },
+            { label: 'Alertas inteligentes', included: true },
+            { label: 'Soporte prioritario', included: false },
         ],
-        cta: 'Empezar Pro',
-        ctaHref: '/auth/register?plan=pro',
-        ctaStyle: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white',
     },
     {
+        id: 'business',
         name: 'Business',
-        price: 89900,
-        period: 'mes',
+        price: { monthly: 89_900, annual: 863_040 },
         description: 'Para emprendedores y equipos',
-        color: 'from-violet-600 to-purple-700',
-        border: 'border-violet-500',
         badge: '🚀 Próximamente',
+        popular: false,
+        comingSoon: true,
         features: [
-            '✅ Todo lo del plan Pro',
-            '✅ Múltiples cuentas',
-            '✅ Panel de equipo',
-            '✅ API access',
-            '✅ Reportes personalizados',
-            '✅ Integración contable',
-            '✅ Soporte prioritario 24/7',
-            '✅ Onboarding personalizado',
-            '✅ SLA garantizado',
+            { label: 'Todo lo del plan Pro', included: true },
+            { label: 'Múltiples cuentas', included: true },
+            { label: 'Panel de equipo', included: true },
+            { label: 'API access', included: true },
+            { label: 'Reportes personalizados', included: true },
+            { label: 'Integración contable', included: true },
+            { label: 'Soporte prioritario 24/7', included: true },
+            { label: 'Onboarding personalizado', included: true },
+            { label: 'SLA garantizado', included: true },
         ],
-        cta: 'Próximamente',
-        ctaHref: '#',
-        ctaStyle: 'bg-violet-700/50 text-violet-300 cursor-not-allowed',
     },
 ]
 
-const formatCOP = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
+const formatCOP = (n: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
 
 export default function PricingPage() {
     const [annual, setAnnual] = useState(false)
+    const [loading, setLoading] = useState<string | null>(null)
+    const { plan: currentPlan } = usePlan()
+
+    const handleCheckout = async (planId: string) => {
+        const userId = localStorage.getItem('userId')
+        if (!userId) { window.location.href = '/auth/register?plan=' + planId; return }
+
+        setLoading(planId)
+        try {
+            const { checkoutUrl } = await createCheckout(planId, annual ? 'annual' : 'monthly')
+            window.location.href = checkoutUrl
+        } catch {
+            alert('Error al procesar el pago. Intenta de nuevo.')
+        } finally {
+            setLoading(null)
+        }
+    }
 
     return (
         <div className="min-h-screen bg-[#030712] text-white">
             <style>{`
-                @keyframes glow { 0%,100%{opacity:.4}50%{opacity:.9} }
-                .shimmer { background:linear-gradient(90deg,#10b981,#34d399,#10b981);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite; }
-                @keyframes shimmer { 0%{background-position:-200% center}100%{background-position:200% center} }
-                .glass { background:rgba(255,255,255,0.04); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); }
+                .shimmer{background:linear-gradient(90deg,#10b981,#34d399,#10b981);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite}
+                @keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+                .glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08)}
             `}</style>
 
-            {/* Navbar simple */}
-            <nav className="glass border-b border-white/5 px-6 py-4 flex items-center justify-between">
+            <nav className="glass border-b border-white/5 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
                 <Link href="/" className="flex items-center gap-2">
                     <Logo width={36} height={36} />
                     <span className="text-xl font-black shimmer">FINNOVA</span>
@@ -115,7 +122,7 @@ export default function PricingPage() {
                         Empieza gratis. Escala cuando lo necesites. Sin sorpresas.
                     </p>
 
-                    {/* Toggle anual/mensual */}
+                    {/* Toggle mensual/anual */}
                     <div className="flex items-center justify-center gap-3 mt-8">
                         <span className={`text-sm ${!annual ? 'text-white font-semibold' : 'text-gray-500'}`}>Mensual</span>
                         <button onClick={() => setAnnual(!annual)}
@@ -124,23 +131,24 @@ export default function PricingPage() {
                             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${annual ? 'left-7' : 'left-1'}`} />
                         </button>
                         <span className={`text-sm ${annual ? 'text-white font-semibold' : 'text-gray-500'}`}>
-                            Anual <span className="text-emerald-400 text-xs font-bold">-20%</span>
+                            Anual <span className="text-emerald-400 text-xs font-bold ml-1">-20%</span>
                         </span>
                     </div>
                 </div>
 
-                {/* Cards de planes */}
+                {/* Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
-                    {plans.map((plan, i) => {
-                        const price = annual && plan.price > 0 ? Math.floor(plan.price * 0.8) : plan.price
-                        const isPopular = plan.badge === '⭐ Más popular'
+                    {plans.map(plan => {
+                        const price = annual ? plan.price.annual : plan.price.monthly
+                        const isCurrentPlan = currentPlan === plan.id
                         return (
-                            <div key={plan.name} className={`relative rounded-2xl p-7 flex flex-col ${isPopular ? 'ring-2 ring-emerald-500 scale-105' : ''}`}
-                                style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${isPopular ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
+                            <div key={plan.id}
+                                className={`relative rounded-2xl p-7 flex flex-col transition-all ${plan.popular ? 'ring-2 ring-emerald-500 scale-105' : ''}`}
+                                style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${plan.popular ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
 
                                 {plan.badge && (
                                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold whitespace-nowrap"
-                                        style={{ background: isPopular ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' }}>
+                                        style={{ background: plan.popular ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' }}>
                                         {plan.badge}
                                     </div>
                                 )}
@@ -151,14 +159,16 @@ export default function PricingPage() {
                                 </div>
 
                                 <div className="mb-6">
-                                    {plan.price === 0 ? (
+                                    {price === 0 ? (
                                         <div className="text-4xl font-black text-white">Gratis</div>
                                     ) : (
                                         <div>
                                             <span className="text-4xl font-black text-white">{formatCOP(price)}</span>
-                                            <span className="text-gray-500 text-sm">/{plan.period}</span>
-                                            {annual && plan.price > 0 && (
-                                                <div className="text-xs text-emerald-400 mt-1">Ahorras {formatCOP(plan.price * 12 - price * 12)}/año</div>
+                                            <span className="text-gray-500 text-sm">/{annual ? 'año' : 'mes'}</span>
+                                            {annual && (
+                                                <div className="text-xs text-emerald-400 mt-1">
+                                                    Ahorras {formatCOP(plan.price.monthly * 12 - price)}/año
+                                                </div>
                                             )}
                                         </div>
                                     )}
@@ -166,19 +176,47 @@ export default function PricingPage() {
 
                                 <ul className="space-y-2.5 mb-8 flex-1">
                                     {plan.features.map(f => (
-                                        <li key={f} className={`text-sm flex items-start gap-2 ${f.startsWith('❌') ? 'text-gray-600' : 'text-gray-300'}`}>
-                                            {f}
+                                        <li key={f.label} className={`text-sm flex items-center gap-2 ${f.included ? 'text-gray-300' : 'text-gray-600'}`}>
+                                            <span>{f.included ? '✅' : '❌'}</span>
+                                            {f.label}
                                         </li>
                                     ))}
                                 </ul>
 
-                                <Link href={plan.ctaHref}
-                                    className={`block text-center py-3 rounded-xl font-bold text-sm transition-all ${plan.ctaStyle}`}>
-                                    {plan.cta}
-                                </Link>
+                                {isCurrentPlan ? (
+                                    <div className="block text-center py-3 rounded-xl font-bold text-sm bg-emerald-900/40 text-emerald-400 border border-emerald-500/30">
+                                        ✓ Plan actual
+                                    </div>
+                                ) : plan.id === 'free' ? (
+                                    <Link href="/auth/register"
+                                        className="block text-center py-3 rounded-xl font-bold text-sm bg-gray-700 hover:bg-gray-600 text-white transition-all">
+                                        Comenzar Gratis
+                                    </Link>
+                                ) : (plan as any).comingSoon ? (
+                                    <div className="block text-center py-3 rounded-xl font-bold text-sm bg-violet-700/30 text-violet-400 cursor-not-allowed">
+                                        Próximamente
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => handleCheckout(plan.id)}
+                                        disabled={loading === plan.id}
+                                        className="block w-full text-center py-3 rounded-xl font-bold text-sm text-white transition-all hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+                                        {loading === plan.id ? '⏳ Procesando...' : `Empezar ${plan.name}`}
+                                    </button>
+                                )}
                             </div>
                         )
                     })}
+                </div>
+
+                {/* Garantía */}
+                <div className="text-center mb-16 p-8 rounded-2xl" style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                    <div className="text-4xl mb-3">🛡️</div>
+                    <h3 className="text-xl font-bold text-white mb-2">Garantía de 7 días</h3>
+                    <p className="text-gray-400 max-w-md mx-auto text-sm">
+                        Si no estás satisfecho en los primeros 7 días, te devolvemos el dinero sin preguntas.
+                    </p>
                 </div>
 
                 {/* FAQ */}
@@ -186,10 +224,11 @@ export default function PricingPage() {
                     <h2 className="text-2xl font-black text-center mb-8">Preguntas frecuentes</h2>
                     <div className="space-y-4">
                         {[
-                            { q: '¿Puedo cambiar de plan en cualquier momento?', a: 'Sí, puedes subir o bajar de plan cuando quieras. Los cambios aplican inmediatamente.' },
-                            { q: '¿Mis datos están seguros?', a: 'Absolutamente. Usamos encriptación de extremo a extremo y nunca compartimos tus datos financieros.' },
-                            { q: '¿Hay período de prueba para el plan Pro?', a: 'El plan Gratis es permanente. Puedes probar todas las funciones básicas sin límite de tiempo.' },
-                            { q: '¿Cómo funciona el pago?', a: 'Aceptamos tarjetas de crédito/débito y PSE. Los pagos son procesados de forma segura.' },
+                            { q: '¿Cómo funciona el pago?', a: 'Procesamos pagos con Wompi — acepta tarjetas Visa/Mastercard, PSE y Nequi. 100% seguro.' },
+                            { q: '¿Puedo cambiar de plan en cualquier momento?', a: 'Sí. Puedes subir de plan inmediatamente. Al bajar, el plan actual sigue activo hasta que expire.' },
+                            { q: '¿Mis datos están seguros?', a: 'Absolutamente. Encriptación de extremo a extremo. Nunca compartimos tus datos financieros.' },
+                            { q: '¿Hay período de prueba?', a: 'El plan Gratis es permanente. Prueba las funciones básicas sin límite de tiempo.' },
+                            { q: '¿Qué pasa si cancelo?', a: 'Sigues teniendo acceso hasta el fin del período pagado. No hay cobros adicionales.' },
                         ].map(faq => (
                             <div key={faq.q} className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                                 <div className="font-semibold text-white mb-2">{faq.q}</div>
@@ -197,14 +236,6 @@ export default function PricingPage() {
                             </div>
                         ))}
                     </div>
-                </div>
-
-                {/* CTA final */}
-                <div className="text-center mt-20">
-                    <p className="text-gray-400 mb-4">¿Tienes preguntas? Escríbenos</p>
-                    <a href="mailto:ctslabscartagena@gmail.com" className="text-emerald-400 hover:text-emerald-300 font-semibold transition">
-                        ctslabscartagena@gmail.com
-                    </a>
                 </div>
             </div>
         </div>

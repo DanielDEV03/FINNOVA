@@ -15,6 +15,7 @@ public interface IApplicationDbContext
     DbSet<Achievement> Achievements { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<AuditLog> AuditLogs { get; }
+    DbSet<Subscription> Subscriptions { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

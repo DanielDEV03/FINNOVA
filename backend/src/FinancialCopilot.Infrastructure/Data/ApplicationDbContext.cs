@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Achievement> Achievements => Set<Achievement>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -150,6 +151,25 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.Entity).IsRequired().HasMaxLength(100);
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Plan).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.BillingCycle).HasMaxLength(20);
+            entity.Property(e => e.AmountPaid).HasPrecision(18, 2);
+            entity.Property(e => e.Currency).HasMaxLength(10);
+            entity.Property(e => e.PaymentReference).HasMaxLength(200);
+            entity.Property(e => e.PaymentGatewayId).HasMaxLength(200);
+            entity.Property(e => e.PaymentMethod).HasMaxLength(50);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.PaymentReference).IsUnique().HasFilter("\"PaymentReference\" IS NOT NULL");
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

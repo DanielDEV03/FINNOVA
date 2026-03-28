@@ -34,6 +34,7 @@ services:
       # Email__SmtpUser, Email__SmtpPassword, Email__FromEmail → configurar en Render dashboard
       # AdminBootstrap__Email, AdminBootstrap__Password → configurar en Render dashboard,
       #   eliminar después del primer deploy exitoso
+      # Wompi__PublicKey, Wompi__PrivateKey → configurar en Render dashboard
 
   # ── AI Engine Python/FastAPI ──────────────────────────────────────────────
   - type: web
