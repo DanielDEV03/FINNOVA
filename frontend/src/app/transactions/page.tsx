@@ -162,7 +162,12 @@ export default function TransactionsPage() {
             })
             setTagInput('')
             loadTransactions(userId)
-        } catch (error) {
+        } catch (error: any) {
+            if (error.response?.status === 402) {
+                alert(error.response.data.message)
+                window.location.href = '/pricing'
+                return
+            }
             alert('Error al registrar transacción')
         }
     }
@@ -234,17 +239,24 @@ export default function TransactionsPage() {
                         </div>
                     </div>
 
-                    {/* Banner límite plan free */}
-                    {!isPro && transactions.length >= 40 && (
-                        <div className="mb-4 p-3 rounded-xl flex items-center justify-between gap-3" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                            <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                                ⚠️ Usaste <strong>{transactions.length}/50</strong> transacciones del plan Gratis este mes.
-                            </p>
-                            <Link href="/pricing" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap hover:underline">
-                                Upgrade Pro →
-                            </Link>
-                        </div>
-                    )}
+                    {/* Banner límite plan free — solo transacciones del mes actual */}
+                    {!isPro && (() => {
+                        const now = new Date()
+                        const thisMonth = transactions.filter(t => {
+                            const d = new Date(t.date)
+                            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+                        }).length
+                        return thisMonth >= 40 ? (
+                            <div className="mb-4 p-3 rounded-xl flex items-center justify-between gap-3" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                                <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                                    ⚠️ Usaste <strong>{thisMonth}/50</strong> transacciones este mes (plan Gratis).
+                                </p>
+                                <Link href="/pricing" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap hover:underline">
+                                    Upgrade Pro →
+                                </Link>
+                            </div>
+                        ) : null
+                    })()}
 
                     {showForm && (
                         <div className="bg-white p-4 sm:p-5 md:p-6 rounded-lg md:rounded-xl shadow-lg mb-6 md:mb-8 border border-gray-200">

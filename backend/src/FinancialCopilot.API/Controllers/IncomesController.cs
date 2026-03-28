@@ -30,6 +30,16 @@ public class IncomesController : ControllerBase
             if (user == null)
                 return NotFound("User not found");
 
+            // Límite plan free: 50 transacciones por mes
+            if (!user.IsPro)
+            {
+                var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var monthlyExpenses = await _context.Expenses.CountAsync(e => e.UserId == userId && e.CreatedAt >= startOfMonth);
+                var monthlyIncomes = await _context.Incomes.CountAsync(i => i.UserId == userId && i.CreatedAt >= startOfMonth);
+                if (monthlyExpenses + monthlyIncomes >= 50)
+                    return StatusCode(402, new { message = "Límite de 50 transacciones/mes alcanzado. Actualiza a Pro para transacciones ilimitadas.", upgradeUrl = "/pricing" });
+            }
+
             var income = new Income
             {
                 Id = Guid.NewGuid(),

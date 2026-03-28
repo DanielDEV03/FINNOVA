@@ -6,7 +6,7 @@ import Logo from './Logo'
 import { logout } from '@/lib/auth'
 import ThemeToggle from './ThemeToggle'
 import { usePlan } from '@/hooks/usePlan'
-import { getPlanLabel, getPlanColor } from '@/lib/subscription'
+import { getPlanLabel } from '@/lib/subscription'
 
 export default function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -66,6 +66,13 @@ export default function Navbar() {
                 {mobileMenuOpen && (
                     <div className="lg:hidden py-4 border-t border-gray-200 dark:border-white/5">
                         <div className="flex flex-col space-y-1">
+                            {/* Plan badge móvil */}
+                            <Link href="/profile" onClick={() => setMobileMenuOpen(false)}
+                                className="px-4 py-2 flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                <span className="text-sm text-gray-600 dark:text-gray-400">Mi plan</span>
+                                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${isPro ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-gray-700/50 text-gray-400'
+                                    }`}>{getPlanLabel(plan)}</span>
+                            </Link>
                             {[
                                 { href: '/dashboard', label: '📊 Dashboard' },
                                 { href: '/transactions', label: '💳 Transacciones' },
@@ -73,6 +80,7 @@ export default function Navbar() {
                                 { href: '/predictions', label: '🔮 Predicciones' },
                                 { href: '/analysis', label: '📈 Análisis' },
                                 { href: '/debts', label: '💰 Deudas' },
+                                { href: '/profile', label: '👤 Mi Perfil' },
                             ].map(item => (
                                 <Link key={item.href} href={item.href} className={mobileLink} onClick={() => setMobileMenuOpen(false)}>
                                     {item.label}

@@ -58,35 +58,6 @@ export default function SimulatorPage() {
     const [months, setMonths] = useState(12)
     const { isPro } = usePlan()
 
-    // Paywall — simulador es Pro
-    if (!loading && !isPro) return (
-        <ProtectedRoute>
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
-                <div className="max-w-md w-full text-center">
-                    <div className="text-6xl mb-4">⏰</div>
-                    <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">Time Machine Financiera</h2>
-                    <p className="text-gray-500 dark:text-gray-400 mb-6">
-                        Simula escenarios futuros: optimista, pesimista, reducción de gastos y pago agresivo de deudas.
-                        Disponible en el plan <span className="text-emerald-400 font-bold">Pro</span>.
-                    </p>
-                    <div className="rounded-xl p-4 mb-6 text-left space-y-2" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                        {['5 escenarios financieros simultáneos', 'Proyección hasta 24 meses', 'Comparativa de escenarios', 'Recomendaciones IA para cada escenario', 'Simulaciones ilimitadas'].map(f => (
-                            <div key={f} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                <span className="text-emerald-400">✓</span> {f}
-                            </div>
-                        ))}
-                    </div>
-                    <Link href="/pricing"
-                        className="inline-block px-8 py-3 rounded-xl font-bold text-white transition-all hover:scale-105"
-                        style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-                        Ver planes →
-                    </Link>
-                    <p className="text-xs text-gray-500 mt-3">Desde $29.900 COP/mes</p>
-                </div>
-            </div>
-        </ProtectedRoute>
-    )
-
     useEffect(() => {
         const id = localStorage.getItem('userId')
         if (id) {
@@ -125,6 +96,33 @@ export default function SimulatorPage() {
     }
 
     if (loading) return <div className="p-8">Simulando escenarios...</div>
+
+    if (!isPro) return (
+        <ProtectedRoute>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
+                <div className="max-w-md w-full text-center">
+                    <div className="text-6xl mb-4">⏰</div>
+                    <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">Time Machine Financiera</h2>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6">
+                        Simula escenarios futuros: optimista, pesimista, reducción de gastos y pago agresivo de deudas.
+                        Disponible en el plan <span className="text-emerald-400 font-bold">Pro</span>.
+                    </p>
+                    <div className="rounded-xl p-4 mb-6 text-left space-y-2" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        {['5 escenarios financieros simultáneos', 'Proyección hasta 24 meses', 'Comparativa de escenarios', 'Recomendaciones IA para cada escenario', 'Simulaciones ilimitadas'].map(f => (
+                            <div key={f} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <span className="text-emerald-400">✓</span> {f}
+                            </div>
+                        ))}
+                    </div>
+                    <Link href="/pricing" className="inline-block px-8 py-3 rounded-xl font-bold text-white transition-all hover:scale-105"
+                        style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+                        Ver planes →
+                    </Link>
+                    <p className="text-xs text-gray-500 mt-3">Desde $29.900 COP/mes</p>
+                </div>
+            </div>
+        </ProtectedRoute>
+    )
 
     if (!simulation) return <div className="p-8">No hay datos para simular</div>
 

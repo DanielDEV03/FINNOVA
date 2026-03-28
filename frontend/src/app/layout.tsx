@@ -2,6 +2,7 @@
 import './globals.css'
 import ClientGamification from '@/components/gamification/ClientGamification'
 import ThemeInit from '@/components/ThemeInit'
+import { PlanProvider } from '@/contexts/PlanContext'
 
 export const metadata: Metadata = {
     title: 'FINNOVA - Tu Copiloto Financiero',
@@ -18,13 +19,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <html lang="es" className="dark">
             <head>
                 <meta name="theme-color" content="#030712" />
-                {/* manifest.json solo en producción con dominio propio */}
+                <link rel="manifest" href="/manifest.json" />
             </head>
             <body className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
                 <ThemeInit />
-                <ClientGamification>
-                    {children}
-                </ClientGamification>
+                <PlanProvider>
+                    <ClientGamification>
+                        {children}
+                    </ClientGamification>
+                </PlanProvider>
             </body>
         </html>
     )
