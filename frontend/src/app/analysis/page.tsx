@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { exportFinancialReport } from '@/lib/exportPDF'
+import { usePlan } from '@/hooks/usePlan'
+import Link from 'next/link'
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip,
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -46,6 +48,7 @@ export default function AnalysisPage() {
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState<string>('')
     const [activeChart, setActiveChart] = useState<'pie' | 'bar' | 'area' | 'radar'>('pie')
+    const { isPro, canUseAdvancedAnalysis } = usePlan()
 
     useEffect(() => {
         const id = localStorage.getItem('userId')
@@ -61,6 +64,35 @@ export default function AnalysisPage() {
         } catch (e) { console.error(e) }
         finally { setLoading(false) }
     }
+
+    // Paywall — análisis avanzado es Pro
+    if (!loading && !canUseAdvancedAnalysis) return (
+        <ProtectedRoute>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
+                <div className="max-w-md w-full text-center">
+                    <div className="text-6xl mb-4">📊</div>
+                    <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">Análisis Avanzado</h2>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6">
+                        Gráficos detallados, tendencias por categoría, radar de gastos y exportación PDF.
+                        Disponible en el plan <span className="text-emerald-400 font-bold">Pro</span>.
+                    </p>
+                    <div className="rounded-xl p-4 mb-6 text-left space-y-2" style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        {['Gráficos de torta, barras, área y radar', 'Análisis por categoría con tendencias', 'Recomendaciones IA personalizadas', 'Exportar reporte PDF completo'].map(f => (
+                            <div key={f} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <span className="text-emerald-400">✓</span> {f}
+                            </div>
+                        ))}
+                    </div>
+                    <Link href="/pricing"
+                        className="inline-block px-8 py-3 rounded-xl font-bold text-white transition-all hover:scale-105"
+                        style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+                        Ver planes →
+                    </Link>
+                    <p className="text-xs text-gray-500 mt-3">Desde $29.900 COP/mes</p>
+                </div>
+            </div>
+        </ProtectedRoute>
+    )
 
     if (loading) return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">

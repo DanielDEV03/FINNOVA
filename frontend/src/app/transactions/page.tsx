@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useGamification } from '@/components/gamification/GamificationProvider'
+import { usePlan } from '@/hooks/usePlan'
+import Link from 'next/link'
 
 const formatCOP = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -30,6 +32,7 @@ interface Transaction {
 
 export default function TransactionsPage() {
     const { showAchievement, triggerUpdate } = useGamification();
+    const { isPro, limits } = usePlan()
     const [userId, setUserId] = useState<string>('')
     const [showForm, setShowForm] = useState<'income' | 'expense' | null>(null)
     const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -206,20 +209,42 @@ export default function TransactionsPage() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-8 gap-3 sm:gap-4">
                         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800">💳 Transacciones</h1>
                         <div className="flex gap-2 w-full sm:w-auto">
-                            <button
-                                onClick={() => setShowForm('income')}
-                                className="flex-1 sm:flex-none bg-gradient-to-r from-green-500 to-green-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 font-semibold text-sm sm:text-base"
-                            >
-                                + Ingreso
-                            </button>
-                            <button
-                                onClick={() => setShowForm('expense')}
-                                className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 font-semibold text-sm sm:text-base"
-                            >
-                                + Gasto
-                            </button>
+                            {!isPro && transactions.length >= 50 ? (
+                                <Link href="/pricing"
+                                    className="flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base text-center transition-all hover:scale-105"
+                                    style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: 'white' }}>
+                                    🔒 Límite alcanzado — Upgrade Pro
+                                </Link>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setShowForm('income')}
+                                        className="flex-1 sm:flex-none bg-gradient-to-r from-green-500 to-green-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 font-semibold text-sm sm:text-base"
+                                    >
+                                        + Ingreso
+                                    </button>
+                                    <button
+                                        onClick={() => setShowForm('expense')}
+                                        className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 font-semibold text-sm sm:text-base"
+                                    >
+                                        + Gasto
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
+
+                    {/* Banner límite plan free */}
+                    {!isPro && transactions.length >= 40 && (
+                        <div className="mb-4 p-3 rounded-xl flex items-center justify-between gap-3" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                            <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                                ⚠️ Usaste <strong>{transactions.length}/50</strong> transacciones del plan Gratis este mes.
+                            </p>
+                            <Link href="/pricing" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap hover:underline">
+                                Upgrade Pro →
+                            </Link>
+                        </div>
+                    )}
 
                     {showForm && (
                         <div className="bg-white p-4 sm:p-5 md:p-6 rounded-lg md:rounded-xl shadow-lg mb-6 md:mb-8 border border-gray-200">

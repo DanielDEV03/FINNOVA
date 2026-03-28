@@ -9,6 +9,7 @@ import AchievementToast from '@/components/gamification/AchievementToast'
 import { useAppTour } from '@/components/AppTour'
 import NotificationBell from '@/components/NotificationBell'
 import { exportFinancialReport } from '@/lib/exportPDF'
+import { usePlan } from '@/hooks/usePlan'
 
 const formatCOP = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -58,6 +59,7 @@ export default function Dashboard() {
     const [alerts, setAlerts] = useState<Alerts | null>(null)
     const [dailyBudget, setDailyBudget] = useState<DailyBudget | null>(null)
     const { startTour } = useAppTour()
+    const { canExportPDF, isPro } = usePlan()
     const [userId, setUserId] = useState<string>('')
     const [showAllAlerts, setShowAllAlerts] = useState(false)
     const [newAchievement, setNewAchievement] = useState<any>(null)
@@ -143,20 +145,29 @@ export default function Dashboard() {
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                             <NotificationBell />
-                            <button
-                                onClick={() => data && exportFinancialReport({
-                                    userName: localStorage.getItem('userName') || 'Usuario',
-                                    totalIncome: data.totalIncome,
-                                    totalExpenses: data.totalExpenses,
-                                    balance: data.balance,
-                                    totalDebt: data.totalDebt,
-                                    transactions: data.recentTransactions
-                                })}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-all hover:scale-105"
-                                style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
-                                title="Exportar reporte PDF">
-                                📄 PDF
-                            </button>
+                            {canExportPDF ? (
+                                <button
+                                    onClick={() => data && exportFinancialReport({
+                                        userName: localStorage.getItem('userName') || 'Usuario',
+                                        totalIncome: data.totalIncome,
+                                        totalExpenses: data.totalExpenses,
+                                        balance: data.balance,
+                                        totalDebt: data.totalDebt,
+                                        transactions: data.recentTransactions
+                                    })}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-400 transition-all hover:scale-105"
+                                    style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
+                                    title="Exportar reporte PDF">
+                                    📄 PDF
+                                </button>
+                            ) : (
+                                <a href="/pricing"
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-gray-500 dark:text-gray-500 transition-all hover:scale-105 hover:text-emerald-400"
+                                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                                    title="Exportar PDF — requiere plan Pro">
+                                    🔒 PDF Pro
+                                </a>
+                            )}
                         </div>
                     </div>
 
