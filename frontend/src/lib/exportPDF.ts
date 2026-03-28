@@ -160,8 +160,8 @@ export async function exportFinancialReport(data: {
                     data.cell.styles.fontStyle = 'bold'
                 }
                 if (data.section === 'body' && data.column.index === 4) {
-                    const raw = data.cell.raw as string
-                    const isIncome = data.row.raw[3]?.toString().includes('Ingreso')
+                    const rowRaw = data.row.raw as string[]
+                    const isIncome = rowRaw[3]?.toString().includes('Ingreso')
                     data.cell.styles.textColor = isIncome ? [16, 185, 129] : [239, 68, 68]
                     data.cell.styles.fontStyle = 'bold'
                 }
