@@ -25,7 +25,7 @@ interface AuditLog {
 }
 
 interface AdminUser {
-    id: string; name: string; email: string; role: string
+    id: string; name: string; email: string; role: string; plan?: string
     createdAt: string; lastLoginAt: string | null; failedLoginAttempts: number; isLocked: boolean
     lockedUntil: string | null; transactionCount: number
 }
@@ -293,7 +293,7 @@ export default function AdminPage() {
                         <div className="bg-gray-800 rounded-xl overflow-x-auto">
                             <table className="w-full text-sm min-w-[700px]">
                                 <thead className="bg-gray-700">
-                                    <tr>{['Nombre', 'Email', 'Rol', 'Último login', 'Transacciones', 'Estado', 'Acciones'].map(h =>
+                                    <tr>{['Nombre', 'Email', 'Rol', 'Plan', 'Último login', 'Transacciones', 'Estado', 'Acciones'].map(h =>
                                         <th key={h} className="px-3 py-3 text-left text-gray-300 font-semibold text-xs">{h}</th>)}</tr>
                                 </thead>
                                 <tbody>
@@ -308,6 +308,14 @@ export default function AdminPage() {
                                                     className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs">
                                                     {['user', 'admin', 'support', 'suspended'].map(r => <option key={r} value={r}>{r}</option>)}
                                                 </select>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${u.plan === 'business' ? 'bg-violet-900 text-violet-300' :
+                                                        u.plan === 'pro' ? 'bg-emerald-900 text-emerald-300' :
+                                                            'bg-gray-700 text-gray-400'
+                                                    }`}>
+                                                    {u.plan === 'business' ? '🚀 Business' : u.plan === 'pro' ? '⭐ Pro' : '🆓 Free'}
+                                                </span>
                                             </td>
                                             <td className="px-3 py-3 text-gray-400 text-xs">{formatDate(u.lastLoginAt)}</td>
                                             <td className="px-3 py-3 text-center text-gray-300">{u.transactionCount}</td>
@@ -392,6 +400,29 @@ export default function AdminPage() {
                                         <span className="text-gray-400 truncate">{l.details || ''}</span>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* ── Activar plan manualmente ── */}
+                            <div className="mt-5 pt-4 border-t border-gray-700">
+                                <h3 className="font-semibold text-sm mb-3">🎯 Activar Plan</h3>
+                                <div className="flex gap-2 flex-wrap">
+                                    {(['free', 'pro', 'business'] as const).map(plan => (
+                                        <button key={plan}
+                                            onClick={() => doAction('/subscriptions/activate-manual', 'post', {
+                                                email: selectedUser.user.email,
+                                                plan,
+                                                billingCycle: 'monthly',
+                                                amountPaid: plan === 'free' ? 0 : plan === 'pro' ? 29900 : 89900
+                                            }, `¿Activar plan ${plan.toUpperCase()} para ${selectedUser.user.email}?`)}
+                                            className={`px-4 py-2 rounded-lg text-sm font-bold transition ${plan === 'free' ? 'bg-gray-600 hover:bg-gray-500 text-white' :
+                                                plan === 'pro' ? 'bg-emerald-700 hover:bg-emerald-600 text-white' :
+                                                    'bg-violet-700 hover:bg-violet-600 text-white'
+                                                }`}>
+                                            {plan === 'free' ? '🆓 Free' : plan === 'pro' ? '⭐ Pro' : '🚀 Business'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">Activa el plan inmediatamente por 1 mes sin cobro.</p>
                             </div>
                         </div>
                     </div>

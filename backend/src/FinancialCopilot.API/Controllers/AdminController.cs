@@ -228,7 +228,7 @@ public class AdminController : ControllerBase
             .Skip((page - 1) * pageSize).Take(pageSize)
             .Select(u => new
             {
-                u.Id, u.Name, u.Email, u.Role, u.CreatedAt, u.LastLoginAt,
+                u.Id, u.Name, u.Email, u.Role, u.Plan, u.PlanExpiresAt, u.CreatedAt, u.LastLoginAt,
                 u.FailedLoginAttempts,
                 isLocked = u.LockedUntil != null && u.LockedUntil > now,
                 lockedUntil = u.LockedUntil,
@@ -247,7 +247,7 @@ public class AdminController : ControllerBase
             .Where(u => u.Id == id)
             .Select(u => new
             {
-                u.Id, u.Name, u.Email, u.Role, u.CreatedAt, u.LastLoginAt,
+                u.Id, u.Name, u.Email, u.Role, u.Plan, u.PlanExpiresAt, u.CreatedAt, u.LastLoginAt,
                 u.FailedLoginAttempts, u.LockedUntil,
                 isLocked = u.LockedUntil != null && u.LockedUntil > now
             })
