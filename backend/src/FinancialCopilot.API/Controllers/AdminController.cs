@@ -388,6 +388,50 @@ public class AdminController : ControllerBase
         return Ok(new { message = $"Usuario {user.Email} eliminado permanentemente" });
     }
 
+    // ─── GESTIÓN DE PLANES ───────────────────────────────────────────────────
+
+    [HttpPost("users/{id}/plan")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> SetPlan(Guid id, [FromBody] SetPlanRequest req)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null) return NotFound();
+
+        var validPlans = new[] { "free", "pro", "business" };
+        if (!validPlans.Contains(req.Plan))
+            return BadRequest(new { message = "Plan inválido. Usa: free, pro, business" });
+
+        var oldPlan = user.Plan;
+        user.Plan = req.Plan;
+        user.PlanExpiresAt = req.Plan == "free" ? null : DateTime.UtcNow.AddMonths(req.Months ?? 1);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        // Registrar en Subscriptions si no es free
+        if (req.Plan != "free")
+        {
+            var sub = new Domain.Entities.Subscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = id,
+                Plan = req.Plan,
+                Status = "active",
+                BillingCycle = "monthly",
+                AmountPaid = 0,
+                Currency = "COP",
+                PaymentReference = $"ADMIN-{id}-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                PaymentMethod = "admin",
+                StartedAt = DateTime.UtcNow,
+                ExpiresAt = user.PlanExpiresAt!.Value,
+                CreatedAt = DateTime.UtcNow,
+            };
+            _context.Subscriptions.Add(sub);
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = $"Plan actualizado: {oldPlan} → {req.Plan} para {user.Email}", expiresAt = user.PlanExpiresAt });
+    }
+
+
     // ─── AUDIT LOG ───────────────────────────────────────────────────────────
 
     [HttpGet("audit-logs")]
@@ -489,3 +533,4 @@ public class AdminController : ControllerBase
 public record UpdateRoleDto(string Role);
 public record BroadcastDto(string Message, string? Details, string? Severity);
 public record TestEmailDto(string ToEmail);
+public record SetPlanRequest(string Plan, int? Months);

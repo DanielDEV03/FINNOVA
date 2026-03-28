@@ -311,8 +311,8 @@ export default function AdminPage() {
                                             </td>
                                             <td className="px-3 py-3">
                                                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${u.plan === 'business' ? 'bg-violet-900 text-violet-300' :
-                                                        u.plan === 'pro' ? 'bg-emerald-900 text-emerald-300' :
-                                                            'bg-gray-700 text-gray-400'
+                                                    u.plan === 'pro' ? 'bg-emerald-900 text-emerald-300' :
+                                                        'bg-gray-700 text-gray-400'
                                                     }`}>
                                                     {u.plan === 'business' ? '🚀 Business' : u.plan === 'pro' ? '⭐ Pro' : '🆓 Free'}
                                                 </span>
@@ -408,11 +408,8 @@ export default function AdminPage() {
                                 <div className="flex gap-2 flex-wrap">
                                     {(['free', 'pro', 'business'] as const).map(plan => (
                                         <button key={plan}
-                                            onClick={() => doAction('/subscriptions/activate-manual', 'post', {
-                                                email: selectedUser.user.email,
-                                                plan,
-                                                billingCycle: 'monthly',
-                                                amountPaid: plan === 'free' ? 0 : plan === 'pro' ? 29900 : 89900
+                                            onClick={() => doAction(`/admin/users/${selectedUser.user.id}/plan`, 'post', {
+                                                plan, months: 1
                                             }, `¿Activar plan ${plan.toUpperCase()} para ${selectedUser.user.email}?`)}
                                             className={`px-4 py-2 rounded-lg text-sm font-bold transition ${plan === 'free' ? 'bg-gray-600 hover:bg-gray-500 text-white' :
                                                 plan === 'pro' ? 'bg-emerald-700 hover:bg-emerald-600 text-white' :
