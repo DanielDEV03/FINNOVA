@@ -362,6 +362,34 @@ static async Task ApplyCustomMigrationsAsync(ApplicationDbContext db)
         await cmd.ExecuteNonQueryAsync();
 
         Console.WriteLine("✓ Custom migrations applied (gamification + Tags fix)");
+
+        // Migración: Subscriptions
+        cmd.CommandText = @"
+            ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""Plan"" text NOT NULL DEFAULT 'free';
+            ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""PlanExpiresAt"" timestamp with time zone;
+            CREATE TABLE IF NOT EXISTS ""Subscriptions"" (
+                ""Id"" uuid NOT NULL,
+                ""UserId"" uuid NOT NULL,
+                ""Plan"" character varying(20) NOT NULL DEFAULT 'pro',
+                ""Status"" character varying(20) NOT NULL DEFAULT 'active',
+                ""BillingCycle"" character varying(20) NOT NULL DEFAULT 'monthly',
+                ""AmountPaid"" numeric(18,2) NOT NULL DEFAULT 0,
+                ""Currency"" character varying(10) NOT NULL DEFAULT 'COP',
+                ""PaymentReference"" character varying(200),
+                ""PaymentGatewayId"" character varying(200),
+                ""PaymentMethod"" character varying(50),
+                ""StartedAt"" timestamp with time zone NOT NULL DEFAULT now(),
+                ""ExpiresAt"" timestamp with time zone NOT NULL DEFAULT now() + interval '1 month',
+                ""CancelledAt"" timestamp with time zone,
+                ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT now(),
+                CONSTRAINT ""PK_Subscriptions"" PRIMARY KEY (""Id""),
+                CONSTRAINT ""FK_Subscriptions_Users_UserId"" FOREIGN KEY (""UserId"")
+                    REFERENCES ""Users"" (""Id"") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_Subscriptions_UserId"" ON ""Subscriptions""(""UserId"");
+        ";
+        await cmd.ExecuteNonQueryAsync();
+        Console.WriteLine("✓ Subscriptions migration applied");
     }
     catch (Exception ex)
     {
