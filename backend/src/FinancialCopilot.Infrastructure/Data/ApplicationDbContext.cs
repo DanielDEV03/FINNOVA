@@ -21,6 +21,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -166,6 +169,56 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.PaymentMethod).HasMaxLength(50);
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.PaymentReference).IsUnique().HasFilter("\"PaymentReference\" IS NOT NULL");
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Account>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Type).HasMaxLength(30);
+            entity.Property(e => e.Currency).HasMaxLength(10);
+            entity.Property(e => e.Color).HasMaxLength(20);
+            entity.Property(e => e.Icon).HasMaxLength(10);
+            entity.HasIndex(e => e.OwnerId);
+            entity.HasOne(e => e.Owner)
+                .WithMany()
+                .HasForeignKey(e => e.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TeamMember>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Role).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.InviteEmail).HasMaxLength(200);
+            entity.Property(e => e.InviteToken).HasMaxLength(200);
+            entity.HasIndex(e => e.AccountId);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.InviteToken).HasFilter("\"InviteToken\" IS NOT NULL");
+            entity.HasOne(e => e.Account)
+                .WithMany(a => a.TeamMembers)
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.KeyHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.KeyPrefix).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.Scopes).HasColumnType("text[]");
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.KeyHash).IsUnique();
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)

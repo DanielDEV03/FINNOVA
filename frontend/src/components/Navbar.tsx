@@ -40,9 +40,9 @@ export default function Navbar() {
                             <Link href="/admin" className="text-red-500 hover:text-red-400 font-bold text-sm transition">🛡️ Admin</Link>
                         )}
                         {/* Plan badge */}
-                        <Link href="/pricing" className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-all hover:scale-105 ${isPro
-                                ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
-                                : 'text-gray-500 border-gray-600/40 bg-gray-800/40 hover:text-emerald-400'
+                        <Link href={isPro ? '/business' : '/pricing'} className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-all hover:scale-105 ${isPro
+                            ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                            : 'text-gray-500 border-gray-600/40 bg-gray-800/40 hover:text-emerald-400'
                             }`}>
                             {getPlanLabel(plan)}
                         </Link>
