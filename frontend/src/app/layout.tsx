@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <html lang="es" className="dark">
             <head>
                 <meta name="theme-color" content="#030712" />
-                <link rel="manifest" href="/manifest.json" />
+                {/* manifest.json solo en producción con dominio propio */}
             </head>
             <body className="bg-white dark:bg-gray-950 text-gray-900 dark:text-white transition-colors duration-300">
                 <ThemeInit />
