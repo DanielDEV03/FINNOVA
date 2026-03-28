@@ -55,14 +55,12 @@ const plans = [
         comingSoon: true,
         features: [
             { label: 'Todo lo del plan Pro', included: true },
-            { label: 'Múltiples cuentas', included: true },
-            { label: 'Panel de equipo', included: true },
-            { label: 'API access', included: true },
-            { label: 'Reportes personalizados', included: true },
-            { label: 'Integración contable', included: true },
+            { label: 'Múltiples cuentas (próximamente)', included: true },
+            { label: 'Panel de equipo (próximamente)', included: true },
+            { label: 'API access (próximamente)', included: true },
+            { label: 'Reportes personalizados (próximamente)', included: true },
             { label: 'Soporte prioritario 24/7', included: true },
             { label: 'Onboarding personalizado', included: true },
-            { label: 'SLA garantizado', included: true },
         ],
     },
 ]
