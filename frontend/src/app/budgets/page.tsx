@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Link from 'next/link'
+import { useGamification } from '@/components/gamification/GamificationProvider'
 
 const formatCOP = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
 
@@ -23,6 +24,7 @@ export default function BudgetsPage() {
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
     const [form, setForm] = useState({ category: 'Alimentación', limitAmount: '' })
+    const { showAchievement, triggerUpdate } = useGamification()
     const now = new Date()
     const [month] = useState(now.getMonth() + 1)
     const [year] = useState(now.getFullYear())
@@ -48,6 +50,8 @@ export default function BudgetsPage() {
         e.preventDefault()
         try {
             await api.post(`/users/${userId}/budgets`, { category: form.category, limitAmount: parseFloat(form.limitAmount), month, year })
+            showAchievement({ title: '🎯 Presupuesto Creado', description: 'Has ganado 20 puntos', icon: '🎯', pointsEarned: 20 })
+            triggerUpdate()
             setShowForm(false); setForm({ category: 'Alimentación', limitAmount: '' }); load(userId)
         } catch { alert('Error al guardar presupuesto') }
     }

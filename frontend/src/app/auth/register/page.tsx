@@ -1,13 +1,16 @@
 ﻿'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { register } from '@/lib/auth'
 import Logo from '@/components/Logo'
 
-export default function RegisterPage() {
+function RegisterForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const planParam = searchParams.get('plan') // recuerda el plan seleccionado antes de registrarse
+
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -34,7 +37,12 @@ export default function RegisterPage() {
         setLoading(true)
         try {
             await register({ name, email, password })
-            router.push('/onboarding')
+            // Si venía de pricing con un plan seleccionado, ir directo a pricing para completar el pago
+            if (planParam && planParam !== 'free') {
+                router.push(`/pricing?plan=${planParam}`)
+            } else {
+                router.push('/onboarding')
+            }
         } catch (err: any) {
             setError(err.response?.data?.message || 'Error al registrar usuario')
         } finally {
@@ -191,5 +199,13 @@ export default function RegisterPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#030712] flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500" /></div>}>
+            <RegisterForm />
+        </Suspense>
     )
 }

@@ -79,26 +79,31 @@ export default function Dashboard() {
     const [dailyBudget, setDailyBudget] = useState<DailyBudget | null>(null)
     const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null)
     const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([])
+    const [userId, setUserId] = useState('')
     const { startTour } = useAppTour()
     const { canExportPDF } = usePlan()
     const [showAllAlerts, setShowAllAlerts] = useState(false)
     const [newAchievement, setNewAchievement] = useState<any>(null)
+    const [dismissedAlerts, setDismissedAlerts] = useState<Set<number>>(new Set())
 
     useEffect(() => {
-        const id = localStorage.getItem('userId')
+        const id = localStorage.getItem('userId') || ''
+        setUserId(id)
         if (id) {
             loadDashboard(id)
             loadAlerts(id)
             loadDailyBudget(id)
             loadBudgets(id)
         }
-
-        // Lanzar tour si viene del onboarding
         if (localStorage.getItem('startTour') === 'true') {
             localStorage.removeItem('startTour')
-            setTimeout(() => startTour(), 1200) // esperar que cargue el DOM
+            setTimeout(() => startTour(), 1200)
         }
     }, [])
+
+    const dismissAlert = (index: number) => {
+        setDismissedAlerts(prev => new Set([...prev, index]))
+    }
 
     const loadDashboard = async (id: string) => {
         try {
@@ -161,7 +166,8 @@ export default function Dashboard() {
 
     // Filtrar alertas críticas y de advertencia
     const criticalAlerts = alerts?.alerts.filter(a => a.severity === 'Critical' || a.severity === 'Warning') || []
-    const displayAlerts = showAllAlerts ? criticalAlerts : criticalAlerts.slice(0, 3)
+    const visibleAlerts = criticalAlerts.filter((_, i) => !dismissedAlerts.has(i))
+    const displayAlerts = showAllAlerts ? visibleAlerts : visibleAlerts.slice(0, 3)
 
     return (
         <ProtectedRoute>
@@ -211,48 +217,52 @@ export default function Dashboard() {
                     </div>
 
                     {/* ALERTAS PRIORITARIAS */}
-                    {criticalAlerts.length > 0 && (
+                    {visibleAlerts.length > 0 && (
                         <div className="mb-6 md:mb-8">
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">🚨 Alertas Prioritarias</h2>
-                                {criticalAlerts.length > 3 && (
-                                    <button
-                                        onClick={() => setShowAllAlerts(!showAllAlerts)}
-                                        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                                    >
-                                        {showAllAlerts ? 'Ver menos' : `Ver todas (${criticalAlerts.length})`}
-                                    </button>
-                                )}
+                                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">🚨 Alertas Prioritarias</h2>
+                                <div className="flex items-center gap-3">
+                                    {visibleAlerts.length > 3 && (
+                                        <button onClick={() => setShowAllAlerts(!showAllAlerts)}
+                                            className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline font-medium">
+                                            {showAllAlerts ? 'Ver menos' : `Ver todas (${visibleAlerts.length})`}
+                                        </button>
+                                    )}
+                                    {dismissedAlerts.size < criticalAlerts.length && (
+                                        <button onClick={() => setDismissedAlerts(new Set(criticalAlerts.map((_, i) => i)))}
+                                            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                                            Descartar todas
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="space-y-3">
-                                {displayAlerts.map((alert, index) => (
-                                    <div
-                                        key={index}
-                                        className={`rounded-lg sm:rounded-xl p-4 sm:p-5 border-2 ${alert.severity === 'Critical'
-                                            ? 'bg-red-50 border-red-300'
-                                            : 'bg-yellow-50 border-yellow-300'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-3 sm:gap-4">
-                                            <span className="text-2xl sm:text-3xl flex-shrink-0">{alert.icon}</span>
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="font-bold text-base sm:text-lg mb-1">{alert.title}</h3>
-                                                <p className="text-sm sm:text-base text-gray-700 mb-3">{alert.message}</p>
-                                                {alert.actionUrl && (
-                                                    <Link
-                                                        href={alert.actionUrl}
-                                                        className={`inline-block px-3 sm:px-4 py-2 rounded-lg text-sm font-medium ${alert.severity === 'Critical'
-                                                            ? 'bg-red-600 text-white hover:bg-red-700'
-                                                            : 'bg-yellow-600 text-white hover:bg-yellow-700'
-                                                            }`}
-                                                    >
-                                                        {alert.actionLabel}
-                                                    </Link>
-                                                )}
+                                {displayAlerts.map((alert, index) => {
+                                    const realIndex = criticalAlerts.indexOf(alert)
+                                    return (
+                                        <div key={index}
+                                            className={`rounded-lg sm:rounded-xl p-4 sm:p-5 border-2 ${alert.severity === 'Critical' ? 'bg-red-50 dark:bg-red-900/10 border-red-300 dark:border-red-700/40' : 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-300 dark:border-yellow-700/40'}`}>
+                                            <div className="flex items-start gap-3 sm:gap-4">
+                                                <span className="text-2xl sm:text-3xl flex-shrink-0">{alert.icon}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-base sm:text-lg mb-1 text-gray-900 dark:text-white">{alert.title}</h3>
+                                                    <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 mb-3">{alert.message}</p>
+                                                    {alert.actionUrl && (
+                                                        <Link href={alert.actionUrl}
+                                                            className={`inline-block px-3 sm:px-4 py-2 rounded-lg text-sm font-medium ${alert.severity === 'Critical' ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-yellow-600 text-white hover:bg-yellow-700'}`}>
+                                                            {alert.actionLabel}
+                                                        </Link>
+                                                    )}
+                                                </div>
+                                                <button onClick={() => dismissAlert(realIndex)}
+                                                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none flex-shrink-0 transition"
+                                                    title="Descartar alerta">
+                                                    ×
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </div>
                     )}

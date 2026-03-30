@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from './Navbar'
+import MobileNav from './mobile/MobileNav'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter()
@@ -15,11 +16,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, [router])
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
             <Navbar />
-            <main className="container mx-auto px-4 py-8">
+            <main className="pb-20 lg:pb-0">
                 {children}
             </main>
+            <MobileNav />
         </div>
     )
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Logo from '@/components/Logo'
 import { createCheckout } from '@/lib/subscription'
@@ -68,10 +69,23 @@ const plans = [
 const formatCOP = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
 
-export default function PricingPage() {
+function PricingContent() {
+    const searchParams = useSearchParams()
     const [annual, setAnnual] = useState(false)
     const [loading, setLoading] = useState<string | null>(null)
     const { plan: currentPlan } = usePlan()
+
+    // Auto-trigger checkout si viene de register con ?plan=
+    useEffect(() => {
+        const planFromUrl = searchParams.get('plan')
+        if (planFromUrl && planFromUrl !== 'free') {
+            const userId = localStorage.getItem('userId')
+            if (userId) {
+                // pequeño delay para que el plan context cargue
+                setTimeout(() => handleCheckout(planFromUrl), 800)
+            }
+        }
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleCheckout = async (planId: string) => {
         const userId = localStorage.getItem('userId')
@@ -237,5 +251,13 @@ export default function PricingPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function PricingPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#030712] flex items-center justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500" /></div>}>
+            <PricingContent />
+        </Suspense>
     )
 }

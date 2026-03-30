@@ -13,8 +13,13 @@ namespace FinancialCopilot.API.Controllers;
 public class BudgetsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly IGamificationService _gamificationService;
 
-    public BudgetsController(IApplicationDbContext context) => _context = context;
+    public BudgetsController(IApplicationDbContext context, IGamificationService gamificationService)
+    {
+        _context = context;
+        _gamificationService = gamificationService;
+    }
 
     // GET /api/users/{userId}/budgets?month=3&year=2026
     // Devuelve presupuestos + gasto real + % de uso
@@ -100,6 +105,7 @@ public class BudgetsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        await _gamificationService.AddPointsAsync(userId, 20, "budget_created", $"Presupuesto de {req.Category} creado 🎯");
         return Ok(new { message = $"Presupuesto de {req.Category} guardado" });
     }
 

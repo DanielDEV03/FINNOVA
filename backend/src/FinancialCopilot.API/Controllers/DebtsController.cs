@@ -13,10 +13,12 @@ namespace FinancialCopilot.API.Controllers;
 public class DebtsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly IGamificationService _gamificationService;
 
-    public DebtsController(IApplicationDbContext context)
+    public DebtsController(IApplicationDbContext context, IGamificationService gamificationService)
     {
         _context = context;
+        _gamificationService = gamificationService;
     }
 
     [HttpPost]
@@ -43,6 +45,8 @@ public class DebtsController : ControllerBase
 
             _context.Debts.Add(debt);
             await _context.SaveChangesAsync();
+
+            await _gamificationService.AddPointsAsync(userId, 15, "debt_registered", "Deuda registrada — ¡tomar control es el primer paso! 💳");
 
             return CreatedAtAction(nameof(GetById), new { userId, id = debt.Id },
                 new DebtDto(
@@ -124,6 +128,13 @@ public class DebtsController : ControllerBase
             }
 
             await _context.SaveChangesAsync();
+
+            // Gamificación: puntos por pago
+            var isFullPayment = debt.RemainingAmount <= 0;
+            await _gamificationService.AddPointsAsync(userId,
+                isFullPayment ? 50 : 25,
+                isFullPayment ? "debt_paid_off" : "debt_payment",
+                isFullPayment ? "¡Deuda liquidada! 🎉" : "Pago de deuda registrado 💵");
 
             return Ok(new DebtDto(
                 debt.Id,

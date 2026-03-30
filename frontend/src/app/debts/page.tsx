@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { useGamification } from '@/components/gamification/GamificationProvider'
 
 const formatCOP = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
 
@@ -23,6 +24,7 @@ export default function DebtsPage() {
     const [payModal, setPayModal] = useState<Debt | null>(null)
     const [payAmount, setPayAmount] = useState('')
     const [form, setForm] = useState({ description: '', totalAmount: '', interestRate: '', type: 'Tarjeta de Crédito' })
+    const { showAchievement, triggerUpdate } = useGamification()
 
     useEffect(() => {
         const id = localStorage.getItem('userId')
@@ -42,6 +44,8 @@ export default function DebtsPage() {
         e.preventDefault()
         try {
             await api.post(`/users/${userId}/debts`, { description: `${form.type}: ${form.description}`, totalAmount: parseFloat(form.totalAmount), interestRate: parseFloat(form.interestRate) })
+            showAchievement({ title: '💳 Deuda Registrada', description: 'Has ganado 15 puntos por tomar control', icon: '💳', pointsEarned: 15 })
+            triggerUpdate()
             setShowForm(false); setForm({ description: '', totalAmount: '', interestRate: '', type: 'Tarjeta de Crédito' }); load(userId)
         } catch { alert('Error al registrar deuda') }
     }
@@ -50,6 +54,14 @@ export default function DebtsPage() {
         if (!payModal || !payAmount) return
         try {
             await api.put(`/users/${userId}/debts/${payModal.id}/payment`, { amount: parseFloat(payAmount) })
+            const isFullPayment = parseFloat(payAmount) >= payModal.remainingAmount
+            showAchievement({
+                title: isFullPayment ? '🎉 ¡Deuda Pagada!' : '💵 Pago Registrado',
+                description: isFullPayment ? 'Has ganado 50 puntos por liquidar una deuda' : 'Has ganado 25 puntos',
+                icon: isFullPayment ? '🎉' : '💵',
+                pointsEarned: isFullPayment ? 50 : 25
+            })
+            triggerUpdate()
             setPayModal(null); setPayAmount(''); load(userId)
         } catch { alert('Error al registrar pago') }
     }
