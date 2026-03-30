@@ -12,9 +12,8 @@ import { getPlanLabel } from '@/lib/subscription'
 const NAV_LINKS = [
     { href: '/dashboard', label: 'Dashboard', id: undefined },
     { href: '/transactions', label: 'Transacciones', id: 'nav-transactions' },
-    { href: '/insights', label: 'Insights', id: undefined },
-    { href: '/predictions', label: 'Predicciones', id: 'nav-predictions' },
     { href: '/analysis', label: 'Análisis', id: 'nav-analysis' },
+    { href: '/predictions', label: 'Predicciones IA', id: 'nav-predictions' },
     { href: '/debts', label: 'Deudas', id: undefined },
     { href: '/profile', label: 'Mi Perfil', id: undefined },
 ]
@@ -46,11 +45,6 @@ export default function Navbar() {
                             <Link key={l.href} href={l.href} id={l.id} className={navLink}>{l.label}</Link>
                         ))}
 
-                        <Link href="/simulator" id="nav-simulator"
-                            className="text-transparent bg-gradient-to-r from-purple-600 via-pink-600 to-yellow-500 bg-clip-text font-black text-sm whitespace-nowrap">
-                            ⏰ TIME MACHINE
-                        </Link>
-
                         {(isPro || isBusiness) && (
                             <Link href="/business" className="text-violet-400 hover:text-violet-300 font-bold text-sm whitespace-nowrap transition">
                                 🚀 Business
@@ -66,8 +60,8 @@ export default function Navbar() {
                     {/* Desktop — acciones derecha */}
                     <div className="hidden lg:flex items-center gap-2 ml-3 shrink-0">
                         <Link href="/profile" className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-all hover:scale-105 ${isPro || isBusiness
-                                ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
-                                : 'text-gray-500 border-gray-600/40 bg-gray-800/40 hover:text-emerald-400'
+                            ? 'text-emerald-400 border-emerald-500/40 bg-emerald-500/10'
+                            : 'text-gray-500 border-gray-600/40 bg-gray-800/40 hover:text-emerald-400'
                             }`}>
                             {getPlanLabel(plan)}
                         </Link>
@@ -98,8 +92,8 @@ export default function Navbar() {
                                 className="px-4 py-2.5 flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-800/50 mb-1">
                                 <span className="text-sm text-gray-600 dark:text-gray-400">Mi plan</span>
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${isPro || isBusiness
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                        : 'bg-gray-700/50 text-gray-400'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-gray-700/50 text-gray-400'
                                     }`}>{getPlanLabel(plan)}</span>
                             </Link>
 
@@ -108,12 +102,6 @@ export default function Navbar() {
                                     {item.label}
                                 </Link>
                             ))}
-
-                            <Link href="/simulator"
-                                className="px-4 py-2.5 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 text-purple-700 dark:text-purple-300 font-bold rounded-lg transition"
-                                onClick={() => setMobileMenuOpen(false)}>
-                                ⏰ TIME MACHINE
-                            </Link>
 
                             {(isPro || isBusiness) && (
                                 <Link href="/business"
