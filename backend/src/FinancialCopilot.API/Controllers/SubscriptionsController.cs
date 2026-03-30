@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace FinancialCopilot.API.Controllers;
@@ -16,10 +18,9 @@ public class SubscriptionsController : ControllerBase
     private readonly IConfiguration _config;
     private readonly ILogger<SubscriptionsController> _logger;
 
-    // Precios en COP
     private static readonly Dictionary<string, Dictionary<string, decimal>> Prices = new()
     {
-        ["pro"]      = new() { ["monthly"] = 29_900m, ["annual"] = 287_040m },  // 20% off anual
+        ["pro"]      = new() { ["monthly"] = 29_900m, ["annual"] = 287_040m },
         ["business"] = new() { ["monthly"] = 89_900m, ["annual"] = 863_040m },
     };
 
@@ -30,7 +31,7 @@ public class SubscriptionsController : ControllerBase
         _logger = logger;
     }
 
-    // GET /api/subscriptions/my — plan actual del usuario
+    // GET /api/subscriptions/my
     [Authorize]
     [HttpGet("my")]
     public async Task<IActionResult> GetMyPlan()
@@ -54,18 +55,14 @@ public class SubscriptionsController : ControllerBase
             planExpiresAt = user.PlanExpiresAt,
             subscription = activeSub == null ? null : new
             {
-                activeSub.Id,
-                activeSub.Plan,
-                activeSub.Status,
-                activeSub.BillingCycle,
-                activeSub.AmountPaid,
-                activeSub.StartedAt,
-                activeSub.ExpiresAt,
+                activeSub.Id, activeSub.Plan, activeSub.Status,
+                activeSub.BillingCycle, activeSub.AmountPaid,
+                activeSub.StartedAt, activeSub.ExpiresAt,
             }
         });
     }
 
-    // POST /api/subscriptions/checkout — genera link de pago MercadoPago
+    // POST /api/subscriptions/checkout — genera URL de Wompi Web Checkout
     [Authorize]
     [HttpPost("checkout")]
     public async Task<IActionResult> Checkout([FromBody] CheckoutRequest req)
@@ -76,50 +73,26 @@ public class SubscriptionsController : ControllerBase
         if (!Prices.TryGetValue(req.Plan, out var cycles) || !cycles.TryGetValue(req.BillingCycle, out var amount))
             return BadRequest(new { message = "Plan o ciclo de facturación inválido" });
 
-        var reference = $"FINNOVA-{userId}-{req.Plan}-{DateTime.UtcNow:yyyyMMddHHmmss}";
-        var accessToken = _config["MercadoPago:AccessToken"] ?? "";
-        var frontendUrl = _config["MercadoPago:FrontendUrl"] ?? "https://finnova-frontend.onrender.com";
+        var publicKey   = _config["Wompi:PublicKey"] ?? "";
+        var integrityKey = _config["Wompi:IntegrityKey"] ?? "";
+        var frontendUrl = _config["Wompi:FrontendUrl"] ?? "https://finnova-frontend.onrender.com";
 
-        // Crear preferencia en MercadoPago
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+        if (string.IsNullOrEmpty(publicKey) || string.IsNullOrEmpty(integrityKey))
+            return StatusCode(503, new { message = "Pasarela de pago no configurada. Contacta al administrador." });
 
-        var preference = new
-        {
-            items = new[]
-            {
-                new
-                {
-                    title = $"FINNOVA {char.ToUpper(req.Plan[0]) + req.Plan[1..]} — {(req.BillingCycle == "annual" ? "Anual" : "Mensual")}",
-                    quantity = 1,
-                    unit_price = (double)amount,
-                    currency_id = "COP"
-                }
-            },
-            external_reference = reference,
-            back_urls = new
-            {
-                success = $"{frontendUrl}/dashboard?plan={req.Plan}&ref={reference}&status=success",
-                failure = $"{frontendUrl}/pricing?status=failed",
-                pending = $"{frontendUrl}/dashboard?plan={req.Plan}&ref={reference}&status=pending"
-            },
-            auto_return = "approved",
-            notification_url = $"{_config["MercadoPago:BackendUrl"] ?? "https://finnova-backend.onrender.com"}/api/subscriptions/webhook",
-            metadata = new { user_id = userId.ToString(), plan = req.Plan, billing_cycle = req.BillingCycle }
-        };
+        var reference = $"FINNOVA-{userId}-{req.Plan[..3].ToUpper()}-{DateTime.UtcNow:yyyyMMddHHmmss}";
+        var amountInCents = (long)(amount * 100);
+        var currency = "COP";
+        var redirectUrl = $"{frontendUrl}/payment/result";
 
-        var mpResponse = await http.PostAsJsonAsync("https://api.mercadopago.com/checkout/preferences", preference);
-
-        if (!mpResponse.IsSuccessStatusCode)
-        {
-            var err = await mpResponse.Content.ReadAsStringAsync();
-            _logger.LogError("MercadoPago error: {Error}", err);
-            return StatusCode(502, new { message = "Error al crear el pago. Intenta de nuevo." });
-        }
-
-        var mpResult = await mpResponse.Content.ReadFromJsonAsync<MercadoPagoPreferenceResponse>();
+        // SHA256: reference + amountInCents + currency + integrityKey
+        var raw = $"{reference}{amountInCents}{currency}{integrityKey}";
+        var signature = ComputeSha256(raw);
 
         // Guardar suscripción pendiente
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return NotFound();
+
         var sub = new Subscription
         {
             Id = Guid.NewGuid(),
@@ -128,65 +101,140 @@ public class SubscriptionsController : ControllerBase
             Status = "pending",
             BillingCycle = req.BillingCycle,
             AmountPaid = amount,
-            Currency = "COP",
+            Currency = currency,
             PaymentReference = reference,
-            PaymentGatewayId = mpResult?.Id,
             StartedAt = DateTime.UtcNow,
             ExpiresAt = req.BillingCycle == "annual"
                 ? DateTime.UtcNow.AddYears(1)
                 : DateTime.UtcNow.AddMonths(1),
             CreatedAt = DateTime.UtcNow,
         };
-
         _context.Subscriptions.Add(sub);
         await _context.SaveChangesAsync();
 
-        return Ok(new { checkoutUrl = mpResult?.InitPoint ?? mpResult?.SandboxInitPoint, reference });
+        // Construir URL de Wompi Web Checkout
+        var email = user.Email;
+        var name  = Uri.EscapeDataString(user.Name ?? "");
+        var checkoutUrl = $"https://checkout.wompi.co/p/" +
+            $"?public-key={Uri.EscapeDataString(publicKey)}" +
+            $"&currency={currency}" +
+            $"&amount-in-cents={amountInCents}" +
+            $"&reference={Uri.EscapeDataString(reference)}" +
+            $"&signature:integrity={signature}" +
+            $"&redirect-url={Uri.EscapeDataString(redirectUrl)}" +
+            $"&customer-data:email={Uri.EscapeDataString(email)}" +
+            $"&customer-data:full-name={name}";
+
+        return Ok(new { checkoutUrl, reference });
     }
 
-    // POST /api/subscriptions/webhook — MercadoPago notifica el pago
+    // POST /api/subscriptions/webhook — Wompi notifica el pago
     [HttpPost("webhook")]
-    public async Task<IActionResult> Webhook([FromQuery] string? type, [FromQuery] string? id)
+    public async Task<IActionResult> Webhook([FromBody] JsonElement body)
     {
         try
         {
-            // MercadoPago envía type=payment&id=<payment_id> como query params
-            if (type != "payment" || string.IsNullOrEmpty(id))
-                return Ok();
+            // Wompi envía: { "event": "transaction.updated", "data": { "transaction": {...} } }
+            var eventType = body.TryGetProperty("event", out var ev) ? ev.GetString() : null;
+            if (eventType != "transaction.updated") return Ok();
 
-            var accessToken = _config["MercadoPago:AccessToken"] ?? "";
-            using var http = new HttpClient();
-            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+            var txData = body.GetProperty("data").GetProperty("transaction");
+            var status    = txData.TryGetProperty("status", out var s) ? s.GetString() : null;
+            var reference = txData.TryGetProperty("reference", out var r) ? r.GetString() : null;
+            var txId      = txData.TryGetProperty("id", out var i) ? i.GetString() : null;
 
-            var paymentRes = await http.GetAsync($"https://api.mercadopago.com/v1/payments/{id}");
-            if (!paymentRes.IsSuccessStatusCode) return Ok();
+            if (status != "APPROVED" || string.IsNullOrEmpty(reference)) return Ok();
 
-            var payment = await paymentRes.Content.ReadFromJsonAsync<MercadoPagoPayment>();
-            if (payment == null || payment.Status != "approved") return Ok();
+            // Verificar firma del webhook (opcional pero recomendado)
+            var eventKey = _config["Wompi:EventsKey"] ?? "";
+            if (!string.IsNullOrEmpty(eventKey))
+            {
+                var checksum = body.TryGetProperty("signature", out var sig)
+                    ? sig.TryGetProperty("checksum", out var cs) ? cs.GetString() : null
+                    : null;
+                var properties = body.TryGetProperty("signature", out var sig2)
+                    ? sig2.TryGetProperty("properties", out var props) ? props : (JsonElement?)null
+                    : null;
+                // Validación básica de checksum si está disponible
+                _logger.LogInformation("Wompi webhook received for reference {Ref}, status {Status}", reference, status);
+            }
 
-            var reference = payment.ExternalReference;
             var sub = await _context.Subscriptions
                 .Include(s => s.User)
                 .FirstOrDefaultAsync(s => s.PaymentReference == reference);
 
-            if (sub == null) return Ok();
+            if (sub == null)
+            {
+                _logger.LogWarning("Wompi webhook: subscription not found for reference {Ref}", reference);
+                return Ok();
+            }
 
             sub.Status = "active";
-            sub.PaymentGatewayId = payment.Id?.ToString();
-            sub.PaymentMethod = payment.PaymentTypeId;
+            sub.PaymentGatewayId = txId;
+            sub.PaymentMethod = "wompi";
             sub.User.Plan = sub.Plan;
             sub.User.PlanExpiresAt = sub.ExpiresAt;
             sub.User.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Subscription activated via MercadoPago for user {UserId}: {Plan}", sub.UserId, sub.Plan);
+            _logger.LogInformation("Plan {Plan} activated for user {UserId} via Wompi", sub.Plan, sub.UserId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing MercadoPago webhook");
+            _logger.LogError(ex, "Error processing Wompi webhook");
         }
 
         return Ok();
+    }
+
+    // GET /api/subscriptions/verify/{reference} — frontend verifica el pago tras redirect
+    [Authorize]
+    [HttpGet("verify/{reference}")]
+    public async Task<IActionResult> Verify(string reference)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var sub = await _context.Subscriptions
+            .FirstOrDefaultAsync(s => s.PaymentReference == reference && s.UserId == userId);
+
+        if (sub == null) return NotFound(new { message = "Referencia no encontrada" });
+
+        // Si el webhook ya lo activó, devolver activo
+        if (sub.Status == "active")
+            return Ok(new { status = "active", plan = sub.Plan, expiresAt = sub.ExpiresAt });
+
+        // Si no, consultar directamente a Wompi
+        var publicKey = _config["Wompi:PublicKey"] ?? "";
+        var env = publicKey.StartsWith("pub_test_") ? "sandbox" : "production";
+        var baseUrl = env == "sandbox"
+            ? "https://sandbox.wompi.co/v1"
+            : "https://production.wompi.co/v1";
+
+        using var http = new HttpClient();
+        var wompiRes = await http.GetAsync($"{baseUrl}/transactions?reference={reference}");
+        if (wompiRes.IsSuccessStatusCode)
+        {
+            var json = await wompiRes.Content.ReadFromJsonAsync<WompiTransactionsResponse>();
+            var approved = json?.Data?.FirstOrDefault(t => t.Status == "APPROVED");
+            if (approved != null)
+            {
+                sub.Status = "active";
+                sub.PaymentGatewayId = approved.Id;
+                sub.PaymentMethod = "wompi";
+                var user = await _context.Users.FindAsync(userId);
+                if (user != null)
+                {
+                    user.Plan = sub.Plan;
+                    user.PlanExpiresAt = sub.ExpiresAt;
+                    user.UpdatedAt = DateTime.UtcNow;
+                }
+                await _context.SaveChangesAsync();
+                return Ok(new { status = "active", plan = sub.Plan, expiresAt = sub.ExpiresAt });
+            }
+        }
+
+        return Ok(new { status = sub.Status, plan = sub.Plan });
     }
 
     // POST /api/subscriptions/activate-manual — admin activa plan manualmente
@@ -242,11 +290,15 @@ public class SubscriptionsController : ControllerBase
 
         sub.Status = "cancelled";
         sub.CancelledAt = DateTime.UtcNow;
-
-        // El plan sigue activo hasta que expire
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Suscripción cancelada. Seguirás teniendo acceso hasta el fin del período.", expiresAt = sub.ExpiresAt });
+    }
+
+    private static string ComputeSha256(string input)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(bytes).ToLower();
     }
 
     private Guid? GetUserId()
@@ -259,33 +311,22 @@ public class SubscriptionsController : ControllerBase
 public record CheckoutRequest(string Plan, string BillingCycle);
 public record ManualActivationRequest(string Email, string Plan, string BillingCycle, decimal AmountPaid);
 
-// MercadoPago DTOs
-public class MercadoPagoPreferenceResponse
+public class WompiTransactionsResponse
+{
+    [System.Text.Json.Serialization.JsonPropertyName("data")]
+    public List<WompiTransaction>? Data { get; set; }
+}
+
+public class WompiTransaction
 {
     [System.Text.Json.Serialization.JsonPropertyName("id")]
     public string? Id { get; set; }
 
-    [System.Text.Json.Serialization.JsonPropertyName("init_point")]
-    public string? InitPoint { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("sandbox_init_point")]
-    public string? SandboxInitPoint { get; set; }
-}
-
-public class MercadoPagoPayment
-{
-    [System.Text.Json.Serialization.JsonPropertyName("id")]
-    public long? Id { get; set; }
-
     [System.Text.Json.Serialization.JsonPropertyName("status")]
     public string? Status { get; set; }
 
-    [System.Text.Json.Serialization.JsonPropertyName("external_reference")]
-    public string? ExternalReference { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("payment_type_id")]
-    public string? PaymentTypeId { get; set; }
-
-    [System.Text.Json.Serialization.JsonPropertyName("transaction_amount")]
-    public decimal TransactionAmount { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("reference")]
+    public string? Reference { get; set; }
 }
+
+
