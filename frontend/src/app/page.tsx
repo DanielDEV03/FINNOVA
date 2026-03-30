@@ -128,6 +128,7 @@ export default function LandingPage() {
                             <a href="#features" className="text-gray-400 hover:text-emerald-400 text-sm font-medium transition-colors">Características</a>
                             <a href="#how" className="text-gray-400 hover:text-emerald-400 text-sm font-medium transition-colors">Cómo funciona</a>
                             <a href="#testimonials" className="text-gray-400 hover:text-emerald-400 text-sm font-medium transition-colors">Testimonios</a>
+                            <a href="#pricing" className="text-gray-400 hover:text-emerald-400 text-sm font-medium transition-colors">Precios</a>
                             <Link href="/auth/login" className="text-gray-300 hover:text-white text-sm font-medium transition-colors">Iniciar Sesión</Link>
                             <button onClick={() => router.push('/auth/register')}
                                 className="relative px-5 py-2.5 rounded-xl text-sm font-bold overflow-hidden group"
@@ -150,6 +151,7 @@ export default function LandingPage() {
                                     {['Características', 'Cómo funciona', 'Testimonios'][i]}
                                 </a>
                             ))}
+                            <a href="#pricing" onClick={() => setMobileMenu(false)} className="block text-gray-300 hover:text-emerald-400 py-2 text-sm font-medium transition-colors">Precios</a>
                             <Link href="/auth/login" className="block text-gray-300 py-2 text-sm">Iniciar Sesión</Link>
                             <button onClick={() => router.push('/auth/register')}
                                 className="w-full py-3 rounded-xl text-sm font-bold text-white"
@@ -416,6 +418,51 @@ export default function LandingPage() {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ── PRICING PREVIEW ── */}
+            <section id="pricing" className="py-24" style={{ background: 'linear-gradient(180deg, #030712 0%, #0a1628 50%, #030712 100%)' }}>
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center mb-14">
+                        <span className="text-emerald-400 text-sm font-semibold uppercase tracking-widest">Precios</span>
+                        <h2 className="text-4xl md:text-5xl font-black text-white mt-3 mb-4">Simple y transparente</h2>
+                        <p className="text-gray-400 text-lg">Empieza gratis. Escala cuando lo necesites.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+                        {[
+                            { name: 'Gratis', price: '$0', period: 'siempre', color: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', badge: null, features: ['Dashboard financiero', 'Hasta 50 transacciones/mes', 'Predicciones básicas IA', 'Alertas básicas'], cta: 'Comenzar Gratis', href: '/auth/register', ctaStyle: { background: 'rgba(255,255,255,0.08)' } },
+                            { name: 'Pro', price: '$29.900', period: '/mes', color: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.4)', badge: '⭐ Más popular', features: ['Transacciones ilimitadas', 'Predicciones IA avanzadas', 'Simulador de escenarios', 'Exportar PDF + Insights'], cta: 'Empezar Pro', href: '/pricing', ctaStyle: { background: 'linear-gradient(135deg,#10b981,#059669)' } },
+                            { name: 'Business', price: '$89.900', period: '/mes', color: 'rgba(139,92,246,0.05)', border: 'rgba(139,92,246,0.3)', badge: '🚀 Equipos', features: ['Todo lo de Pro', 'Múltiples cuentas', 'Panel de equipo', 'API access + Soporte 24/7'], cta: 'Empezar Business', href: '/pricing', ctaStyle: { background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)' } },
+                        ].map((p, i) => (
+                            <div key={i} className={`rounded-2xl p-6 flex flex-col ${i === 1 ? 'ring-2 ring-emerald-500 scale-105' : ''}`}
+                                style={{ background: p.color, border: `1px solid ${p.border}` }}>
+                                {p.badge && (
+                                    <div className="text-xs font-bold text-center mb-3 py-1 px-3 rounded-full self-center"
+                                        style={{ background: i === 1 ? 'linear-gradient(135deg,#10b981,#059669)' : 'rgba(139,92,246,0.3)' }}>
+                                        {p.badge}
+                                    </div>
+                                )}
+                                <h3 className="text-xl font-black text-white mb-1">{p.name}</h3>
+                                <div className="mb-5">
+                                    <span className="text-3xl font-black text-white">{p.price}</span>
+                                    <span className="text-gray-500 text-sm">{p.period}</span>
+                                </div>
+                                <ul className="space-y-2 mb-6 flex-1">
+                                    {p.features.map(f => <li key={f} className="text-sm text-gray-300 flex items-center gap-2"><span className="text-emerald-400">✓</span>{f}</li>)}
+                                </ul>
+                                <Link href={p.href} className="block text-center py-2.5 rounded-xl font-bold text-sm text-white transition hover:scale-105"
+                                    style={p.ctaStyle as React.CSSProperties}>
+                                    {p.cta}
+                                </Link>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="text-center">
+                        <Link href="/pricing" className="text-emerald-400 hover:text-emerald-300 text-sm font-semibold transition-colors">
+                            Ver comparación completa de planes →
+                        </Link>
                     </div>
                 </div>
             </section>
