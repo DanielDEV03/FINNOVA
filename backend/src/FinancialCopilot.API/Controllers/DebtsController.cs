@@ -156,6 +156,98 @@ public class DebtsController : ControllerBase
 
         return NoContent();
     }
+
+    // GET /api/users/{userId}/debts/analysis — análisis IA de deudas
+    [HttpGet("analysis")]
+    public async Task<IActionResult> GetDebtAnalysis(Guid userId)
+    {
+        var debts = await _context.Debts
+            .Where(d => d.UserId == userId && d.EndDate == null)
+            .ToListAsync();
+
+        if (!debts.Any())
+            return Ok(new { message = "Sin deudas activas", strategies = new object[] { }, totalInterestAvalanche = 0, totalInterestSnowball = 0 });
+
+        var totalIncome = await _context.Incomes.Where(i => i.UserId == userId).SumAsync(i => (decimal?)i.Amount) ?? 0;
+        var totalExpenses = await _context.Expenses.Where(e => e.UserId == userId).SumAsync(e => (decimal?)e.Amount) ?? 0;
+        var monthCount = Math.Max(1, await _context.Incomes.Where(i => i.UserId == userId).Select(i => i.Date.Month).Distinct().CountAsync());
+        var monthlyFree = (totalIncome - totalExpenses) / monthCount;
+        var extraPayment = Math.Max(0, monthlyFree * 0.3m); // 30% del excedente para deudas
+
+        // Estrategia Avalancha (mayor interés primero)
+        var avalanche = SimulateStrategy(debts.OrderByDescending(d => d.InterestRate).ToList(), extraPayment);
+        // Estrategia Bola de Nieve (menor saldo primero)
+        var snowball = SimulateStrategy(debts.OrderBy(d => d.RemainingAmount).ToList(), extraPayment);
+
+        var totalDebt = debts.Sum(d => d.RemainingAmount);
+        var totalMonthlyInterest = debts.Sum(d => d.RemainingAmount * (d.InterestRate / 100 / 12));
+
+        return Ok(new
+        {
+            summary = new
+            {
+                totalDebt,
+                totalMonthlyInterest,
+                monthlyFreeAmount = monthlyFree,
+                extraPaymentSuggested = extraPayment,
+                debtCount = debts.Count
+            },
+            strategies = new
+            {
+                avalanche = new { name = "Avalancha", description = "Paga primero la deuda con mayor tasa de interés", months = avalanche.months, totalInterest = avalanche.totalInterest, savings = snowball.totalInterest - avalanche.totalInterest },
+                snowball = new { name = "Bola de Nieve", description = "Paga primero la deuda más pequeña para ganar motivación", months = snowball.months, totalInterest = snowball.totalInterest, savings = avalanche.totalInterest - snowball.totalInterest }
+            },
+            recommended = avalanche.totalInterest <= snowball.totalInterest ? "avalanche" : "snowball",
+            recommendations = GenerateRecommendations(debts, monthlyFree, totalMonthlyInterest)
+        });
+    }
+
+    private static (int months, decimal totalInterest) SimulateStrategy(List<Debt> orderedDebts, decimal extraPayment)
+    {
+        var remaining = orderedDebts.Select(d => d.RemainingAmount).ToList();
+        var rates = orderedDebts.Select(d => d.InterestRate / 100 / 12).ToList();
+        decimal totalInterest = 0;
+        int months = 0;
+
+        while (remaining.Any(r => r > 0) && months < 360)
+        {
+            months++;
+            decimal extra = extraPayment;
+            for (int i = 0; i < remaining.Count; i++)
+            {
+                if (remaining[i] <= 0) continue;
+                var interest = remaining[i] * rates[i];
+                totalInterest += interest;
+                var minPayment = Math.Min(remaining[i] * 0.05m + interest, remaining[i] + interest);
+                remaining[i] = Math.Max(0, remaining[i] + interest - minPayment);
+                if (remaining[i] <= 0) { remaining[i] = 0; extra += minPayment; }
+            }
+            // Aplicar extra al primero con saldo
+            for (int i = 0; i < remaining.Count; i++)
+            {
+                if (remaining[i] <= 0) continue;
+                remaining[i] = Math.Max(0, remaining[i] - extra);
+                break;
+            }
+        }
+        return (months, Math.Round(totalInterest, 0));
+    }
+
+    private static List<string> GenerateRecommendations(List<Debt> debts, decimal monthlyFree, decimal monthlyInterest)
+    {
+        var recs = new List<string>();
+        var highInterest = debts.Where(d => d.InterestRate > 20).ToList();
+        if (highInterest.Any())
+            recs.Add($"Tienes {highInterest.Count} deuda(s) con tasa >20% anual. Prioriza pagarlas para ahorrar en intereses.");
+        if (monthlyInterest > monthlyFree * 0.3m)
+            recs.Add("Tus intereses mensuales son altos respecto a tu excedente. Considera consolidar deudas.");
+        if (debts.Count > 3)
+            recs.Add("Con múltiples deudas, la estrategia Avalancha puede ahorrarte más dinero en intereses.");
+        if (monthlyFree > 0)
+            recs.Add($"Tienes ~{monthlyFree:N0} COP/mes de excedente. Destinar el 30% ({monthlyFree * 0.3m:N0} COP) a deudas acelera tu libertad financiera.");
+        recs.Add("Evita adquirir nuevas deudas mientras pagas las actuales para no perder progreso.");
+        return recs;
+    }
 }
 
 public record DebtDto(

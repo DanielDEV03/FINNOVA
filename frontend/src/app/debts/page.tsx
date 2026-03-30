@@ -4,440 +4,326 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
-const formatCOP = (amount: number) => {
-    return new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: 'COP',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(amount)
-}
+const formatCOP = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n)
 
 interface Debt {
-    id: string
-    description: string
-    totalAmount: number
-    remainingAmount: number
-    interestRate: number
-    startDate: string
-    endDate: string | null
+    id: string; description: string; totalAmount: number; remainingAmount: number
+    interestRate: number; startDate: string; endDate: string | null
 }
 
+const DEBT_TYPES = ['Tarjeta de Crédito', 'Préstamo Personal', 'Hipoteca', 'Vehículo', 'Educativo', 'Familiar', 'Otro']
+
 export default function DebtsPage() {
-    const [userId, setUserId] = useState<string>('')
+    const [userId, setUserId] = useState('')
     const [debts, setDebts] = useState<Debt[]>([])
+    const [analysis, setAnalysis] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [tab, setTab] = useState<'list' | 'strategies'>('list')
     const [showForm, setShowForm] = useState(false)
-    const [showPaymentModal, setShowPaymentModal] = useState(false)
-    const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null)
-    const [paymentAmount, setPaymentAmount] = useState('')
-    const [formData, setFormData] = useState({
-        description: '',
-        totalAmount: '',
-        interestRate: ''
-    })
+    const [payModal, setPayModal] = useState<Debt | null>(null)
+    const [payAmount, setPayAmount] = useState('')
+    const [form, setForm] = useState({ description: '', totalAmount: '', interestRate: '', type: 'Tarjeta de Crédito' })
 
     useEffect(() => {
         const id = localStorage.getItem('userId')
-        if (id) {
-            setUserId(id)
-            loadDebts(id)
-        }
+        if (id) { setUserId(id); load(id) }
     }, [])
 
-    const loadDebts = async (id: string) => {
+    const load = async (id: string) => {
         try {
             setLoading(true)
-            const response = await api.get(`/users/${id}/debts`)
-            setDebts(response.data)
-        } catch (error) {
-            console.error('Error loading debts:', error)
-        } finally {
-            setLoading(false)
-        }
+            const [d, a] = await Promise.all([api.get(`/users/${id}/debts`), api.get(`/users/${id}/debts/analysis`)])
+            setDebts(d.data); setAnalysis(a.data)
+        } catch (e) { console.error(e) }
+        finally { setLoading(false) }
     }
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault()
         try {
-            await api.post(`/users/${userId}/debts`, {
-                description: formData.description,
-                totalAmount: parseFloat(formData.totalAmount),
-                interestRate: parseFloat(formData.interestRate)
-            })
-            alert('Deuda registrada exitosamente')
-            setShowForm(false)
-            setFormData({
-                description: '',
-                totalAmount: '',
-                interestRate: ''
-            })
-            loadDebts(userId)
-        } catch (error) {
-            alert('Error al registrar deuda')
-        }
+            await api.post(`/users/${userId}/debts`, { description: `${form.type}: ${form.description}`, totalAmount: parseFloat(form.totalAmount), interestRate: parseFloat(form.interestRate) })
+            setShowForm(false); setForm({ description: '', totalAmount: '', interestRate: '', type: 'Tarjeta de Crédito' }); load(userId)
+        } catch { alert('Error al registrar deuda') }
     }
 
-    const handlePayment = async () => {
-        if (!selectedDebt || !paymentAmount) return
-
+    const pay = async () => {
+        if (!payModal || !payAmount) return
         try {
-            await api.put(`/users/${userId}/debts/${selectedDebt.id}/payment`, {
-                amount: parseFloat(paymentAmount)
-            })
-            alert('Pago registrado exitosamente')
-            setShowPaymentModal(false)
-            setSelectedDebt(null)
-            setPaymentAmount('')
-            loadDebts(userId)
-        } catch (error) {
-            alert('Error al registrar pago')
-        }
+            await api.put(`/users/${userId}/debts/${payModal.id}/payment`, { amount: parseFloat(payAmount) })
+            setPayModal(null); setPayAmount(''); load(userId)
+        } catch { alert('Error al registrar pago') }
     }
 
-    const handleDelete = async (debtId: string) => {
-        if (!confirm('¿Estás seguro de eliminar esta deuda?')) return
-
-        try {
-            await api.delete(`/users/${userId}/debts/${debtId}`)
-            alert('Deuda eliminada')
-            loadDebts(userId)
-        } catch (error) {
-            alert('Error al eliminar deuda')
-        }
+    const del = async (id: string) => {
+        if (!confirm('¿Eliminar esta deuda?')) return
+        await api.delete(`/users/${userId}/debts/${id}`); load(userId)
     }
 
-    const calculateProgress = (debt: Debt) => {
-        const paid = debt.totalAmount - debt.remainingAmount
-        return (paid / debt.totalAmount) * 100
-    }
+    const progress = (d: Debt) => ((d.totalAmount - d.remainingAmount) / d.totalAmount) * 100
+    const monthlyInterest = (d: Debt) => d.remainingAmount * (d.interestRate / 100 / 12)
+    const totalDebt = debts.filter(d => !d.endDate).reduce((s, d) => s + d.remainingAmount, 0)
+    const totalPaid = debts.reduce((s, d) => s + (d.totalAmount - d.remainingAmount), 0)
+    const totalMonthlyInterest = debts.filter(d => !d.endDate).reduce((s, d) => s + monthlyInterest(d), 0)
 
-    const calculateMonthlyPayment = (debt: Debt) => {
-        // Calcular pago mensual sugerido (5% del saldo restante)
-        return debt.remainingAmount * 0.05
-    }
-
-    const calculateMonthlyInterest = (debt: Debt) => {
-        // Calcular interés mensual (tasa anual / 12)
-        const monthlyRate = debt.interestRate / 100 / 12
-        return debt.remainingAmount * monthlyRate
-    }
-
-    const calculateMonthsToPayOff = (debt: Debt) => {
-        const monthlyPayment = calculateMonthlyPayment(debt)
-        if (monthlyPayment <= 0) return Infinity
-        return Math.ceil(debt.remainingAmount / monthlyPayment)
-    }
-
-    const totalDebt = debts.reduce((sum, debt) => sum + debt.remainingAmount, 0)
-    const totalOriginal = debts.reduce((sum, debt) => sum + debt.totalAmount, 0)
-    const totalPaid = totalOriginal - totalDebt
+    const card = "bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-white/5 p-5"
 
     return (
         <ProtectedRoute>
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-3 sm:p-4 md:p-8">
-                <div className="w-full max-w-7xl mx-auto">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-8 gap-3 sm:gap-4">
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 md:p-8">
+                <div className="max-w-5xl mx-auto">
+
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                         <div>
-                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-1 sm:mb-2">💳 Gestión de Deudas</h1>
-                            <p className="text-sm sm:text-base text-gray-600">Controla y reduce tus deudas de forma inteligente</p>
+                            <h1 className="text-3xl md:text-4xl font-black text-gray-900 dark:text-white">💳 Deudas</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">Gestiona y elimina tus deudas con estrategias IA</p>
                         </div>
-                        <button
-                            onClick={() => setShowForm(true)}
-                            className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 font-semibold text-sm sm:text-base"
-                        >
+                        <button onClick={() => setShowForm(true)}
+                            className="px-5 py-2.5 rounded-xl font-bold text-white transition hover:scale-105"
+                            style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
                             + Nueva Deuda
                         </button>
                     </div>
 
-                    {/* Resumen */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6 mb-6 md:mb-8">
-                        <div className="bg-white p-4 sm:p-5 md:p-6 rounded-lg md:rounded-xl shadow-lg border border-gray-200">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-gray-600 text-xs sm:text-sm font-medium">Deuda Total</h3>
-                                <span className="text-2xl sm:text-3xl">💰</span>
+                    {/* KPIs */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        {[
+                            { label: 'Deuda Total', value: formatCOP(totalDebt), color: 'text-red-500', icon: '💳' },
+                            { label: 'Total Pagado', value: formatCOP(totalPaid), color: 'text-emerald-500', icon: '✅' },
+                            { label: 'Interés Mensual', value: formatCOP(totalMonthlyInterest), color: 'text-orange-500', icon: '📈' },
+                            { label: 'Deudas Activas', value: String(debts.filter(d => !d.endDate).length), color: 'text-violet-500', icon: '📋' },
+                        ].map(k => (
+                            <div key={k.label} className={card}>
+                                <div className="text-2xl mb-2">{k.icon}</div>
+                                <p className="text-xs text-gray-500 mb-1">{k.label}</p>
+                                <p className={`text-xl font-black ${k.color}`}>{k.value}</p>
                             </div>
-                            <p className="text-2xl sm:text-3xl font-bold text-red-600 break-words">{formatCOP(totalDebt)}</p>
-                            <p className="text-xs sm:text-sm text-gray-500 mt-1">{debts.length} deuda(s) activa(s)</p>
-                        </div>
-
-                        <div className="bg-white p-4 sm:p-5 md:p-6 rounded-lg md:rounded-xl shadow-lg border border-gray-200">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-gray-600 text-xs sm:text-sm font-medium">Total Pagado</h3>
-                                <span className="text-2xl sm:text-3xl">✅</span>
-                            </div>
-                            <p className="text-2xl sm:text-3xl font-bold text-green-600 break-words">{formatCOP(totalPaid)}</p>
-                            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                                {totalOriginal > 0 ? ((totalPaid / totalOriginal) * 100).toFixed(1) : 0}% del total
-                            </p>
-                        </div>
-
-                        <div className="bg-white p-4 sm:p-5 md:p-6 rounded-lg md:rounded-xl shadow-lg border border-gray-200 sm:col-span-2 md:col-span-1">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-gray-600 text-xs sm:text-sm font-medium">Deuda Original</h3>
-                                <span className="text-2xl sm:text-3xl">📊</span>
-                            </div>
-                            <p className="text-2xl sm:text-3xl font-bold text-gray-800 break-words">{formatCOP(totalOriginal)}</p>
-                            <p className="text-xs sm:text-sm text-gray-500 mt-1">Monto inicial total</p>
-                        </div>
+                        ))}
                     </div>
 
-                    {/* Formulario */}
+                    {/* Tabs */}
+                    <div className="flex gap-2 mb-6 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl w-fit">
+                        <button onClick={() => setTab('list')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${tab === 'list' ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white' : 'text-gray-500'}`}>
+                            📋 Mis Deudas
+                        </button>
+                        <button onClick={() => setTab('strategies')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${tab === 'strategies' ? 'bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-white' : 'text-gray-500'}`}>
+                            🤖 Estrategias IA
+                        </button>
+                    </div>
+
+                    {/* Formulario nueva deuda */}
                     {showForm && (
-                        <div className="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-200">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-gray-800">💳 Nueva Deuda</h2>
-                                <button
-                                    onClick={() => setShowForm(false)}
-                                    className="text-gray-400 hover:text-gray-600 text-2xl"
-                                >
-                                    ×
-                                </button>
+                        <div className={`${card} mb-6`}>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="font-bold text-gray-900 dark:text-white">💳 Nueva Deuda</h2>
+                                <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                             </div>
-
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Descripción de la Deuda</label>
-                                    <input
-                                        type="text"
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        className="w-full p-3 border rounded-lg"
-                                        placeholder="Ej: Tarjeta de Crédito Bancolombia, Préstamo Personal"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <form onSubmit={submit} className="space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Monto Total</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.totalAmount}
-                                            onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
-                                            className="w-full p-3 border rounded-lg"
-                                            required
-                                        />
+                                        <label className="text-xs text-gray-500 block mb-1">Tipo de deuda</label>
+                                        <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
+                                            className="w-full p-3 border rounded-xl dark:bg-gray-800 dark:border-white/10 text-sm">
+                                            {DEBT_TYPES.map(t => <option key={t}>{t}</option>)}
+                                        </select>
                                     </div>
-
                                     <div>
-                                        <label className="block text-sm font-medium mb-1">Tasa de Interés Anual (%)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.interestRate}
-                                            onChange={(e) => setFormData({ ...formData, interestRate: e.target.value })}
-                                            className="w-full p-3 border rounded-lg"
-                                            placeholder="Ej: 24.5"
-                                            required
-                                        />
+                                        <label className="text-xs text-gray-500 block mb-1">Descripción</label>
+                                        <input required placeholder="Ej: Bancolombia Visa" value={form.description}
+                                            onChange={e => setForm({ ...form, description: e.target.value })}
+                                            className="w-full p-3 border rounded-xl dark:bg-gray-800 dark:border-white/10 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500 block mb-1">Monto total (COP)</label>
+                                        <input required type="number" step="1000" placeholder="5000000" value={form.totalAmount}
+                                            onChange={e => setForm({ ...form, totalAmount: e.target.value })}
+                                            className="w-full p-3 border rounded-xl dark:bg-gray-800 dark:border-white/10 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500 block mb-1">Tasa de interés anual (%)</label>
+                                        <input required type="number" step="0.1" placeholder="24.5" value={form.interestRate}
+                                            onChange={e => setForm({ ...form, interestRate: e.target.value })}
+                                            className="w-full p-3 border rounded-xl dark:bg-gray-800 dark:border-white/10 text-sm" />
                                     </div>
                                 </div>
-
-                                <div className="flex gap-4">
-                                    <button
-                                        type="submit"
-                                        className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 rounded-lg hover:shadow-lg transition-all font-semibold"
-                                    >
-                                        💾 Guardar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowForm(false)}
-                                        className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-all font-semibold"
-                                    >
-                                        Cancelar
-                                    </button>
+                                {form.totalAmount && form.interestRate && (
+                                    <div className="p-3 bg-orange-50 dark:bg-orange-900/10 rounded-xl text-sm text-orange-700 dark:text-orange-400">
+                                        💡 Interés mensual estimado: <strong>{formatCOP(parseFloat(form.totalAmount) * parseFloat(form.interestRate) / 100 / 12)}</strong>
+                                    </div>
+                                )}
+                                <div className="flex gap-3">
+                                    <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>💾 Guardar</button>
+                                    <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">Cancelar</button>
                                 </div>
                             </form>
                         </div>
                     )}
 
-                    {/* Lista de Deudas */}
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-                        <div className="p-6 bg-gradient-to-r from-red-500 to-orange-600 text-white">
-                            <h2 className="text-2xl font-bold">📋 Tus Deudas</h2>
-                            <p className="text-sm opacity-90 mt-1">
-                                {debts.length} deuda(s) registrada(s)
-                            </p>
-                        </div>
-
-                        {loading ? (
-                            <div className="p-12 text-center">
-                                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-red-500"></div>
-                                <p className="mt-4 text-gray-600">Cargando deudas...</p>
-                            </div>
-                        ) : debts.length === 0 ? (
-                            <div className="p-12 text-center">
-                                <span className="text-6xl mb-4 block">🎉</span>
-                                <p className="text-xl text-gray-600 mb-2">¡No tienes deudas registradas!</p>
-                                <p className="text-gray-500">Registra una deuda para comenzar a gestionarla</p>
-                            </div>
-                        ) : (
-                            <div className="divide-y divide-gray-200">
-                                {debts.map((debt) => {
-                                    const progress = calculateProgress(debt)
-                                    const monthlyPayment = calculateMonthlyPayment(debt)
-                                    const monthlyInterest = calculateMonthlyInterest(debt)
-                                    const monthsLeft = calculateMonthsToPayOff(debt)
-                                    const isPaid = debt.endDate !== null
-
-                                    return (
-                                        <div key={debt.id} className={`p-6 hover:bg-gray-50 transition-colors ${isPaid ? 'opacity-60' : ''}`}>
-                                            <div className="flex flex-col md:flex-row justify-between gap-4">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        <h3 className="text-xl font-bold text-gray-800">{debt.description}</h3>
-                                                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
-                                                            {debt.interestRate}% anual
-                                                        </span>
-                                                        {isPaid && (
-                                                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                                                                ✅ Pagada
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                                                        <div>
-                                                            <p className="text-xs text-gray-500">Deuda Restante</p>
-                                                            <p className="text-lg font-bold text-red-600">{formatCOP(debt.remainingAmount)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs text-gray-500">Deuda Original</p>
-                                                            <p className="text-lg font-bold text-gray-700">{formatCOP(debt.totalAmount)}</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs text-gray-500">Interés Mensual</p>
-                                                            <p className="text-lg font-bold text-orange-600">{formatCOP(monthlyInterest)}</p>
-                                                            <p className="text-xs text-gray-500">{(debt.interestRate / 12).toFixed(2)}% del saldo</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs text-gray-500">Pago Sugerido</p>
-                                                            <p className="text-lg font-bold text-emerald-600">{formatCOP(monthlyPayment)}</p>
-                                                            <p className="text-xs text-gray-500">5% del saldo</p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                                                        <p className="text-sm text-gray-700">
-                                                            💡 <span className="font-semibold">Fecha de inicio:</span> {new Date(debt.startDate).toLocaleDateString('es-CO')}
-                                                        </p>
-                                                        {!isPaid && (
-                                                            <p className="text-sm text-gray-700 mt-1">
-                                                                ⚠️ Cada mes se genera <span className="font-bold text-orange-600">{formatCOP(monthlyInterest)}</span> de interés
-                                                            </p>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="mb-3">
-                                                        <div className="flex justify-between text-sm mb-1">
-                                                            <span className="text-gray-600">Progreso de Pago</span>
-                                                            <span className="font-semibold text-green-600">{progress.toFixed(1)}%</span>
-                                                        </div>
-                                                        <div className="w-full bg-gray-200 rounded-full h-3">
-                                                            <div
-                                                                className="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all"
-                                                                style={{ width: `${progress}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {!isPaid && monthsLeft !== Infinity && (
-                                                        <p className="text-sm text-gray-600">
-                                                            ⏱️ Aproximadamente {monthsLeft} mes(es) para pagar con el pago sugerido
-                                                        </p>
-                                                    )}
-                                                    {isPaid && debt.endDate && (
-                                                        <p className="text-sm text-green-600 font-semibold">
-                                                            🎉 Pagada completamente el {new Date(debt.endDate).toLocaleDateString('es-CO')}
-                                                        </p>
-                                                    )}
+                    {/* Tab: Lista */}
+                    {tab === 'list' && (
+                        <div className="space-y-4">
+                            {loading ? (
+                                <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500" /></div>
+                            ) : debts.length === 0 ? (
+                                <div className={`${card} text-center py-16`}>
+                                    <div className="text-6xl mb-4">🎉</div>
+                                    <p className="text-xl font-bold text-gray-900 dark:text-white mb-2">¡Sin deudas registradas!</p>
+                                    <p className="text-gray-500">Registra una deuda para comenzar a gestionarla con IA</p>
+                                </div>
+                            ) : debts.map(debt => {
+                                const prog = progress(debt)
+                                const mInterest = monthlyInterest(debt)
+                                const isPaid = !!debt.endDate
+                                const monthsLeft = Math.ceil(debt.remainingAmount / (debt.remainingAmount * 0.05))
+                                return (
+                                    <div key={debt.id} className={`${card} ${isPaid ? 'opacity-60' : ''}`}>
+                                        <div className="flex flex-col md:flex-row gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap items-center gap-2 mb-3">
+                                                    <h3 className="font-black text-gray-900 dark:text-white">{debt.description}</h3>
+                                                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-xs font-bold">{debt.interestRate}% anual</span>
+                                                    {isPaid && <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full text-xs font-bold">✅ Pagada</span>}
                                                 </div>
 
-                                                <div className="flex md:flex-col gap-2">
-                                                    {!isPaid && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedDebt(debt)
-                                                                setShowPaymentModal(true)
-                                                            }}
-                                                            className="flex-1 md:flex-none bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all font-semibold"
-                                                        >
-                                                            💵 Pagar
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => handleDelete(debt.id)}
-                                                        className="flex-1 md:flex-none bg-red-100 text-red-600 px-4 py-2 rounded-lg hover:bg-red-200 transition-all font-semibold"
-                                                    >
-                                                        🗑️ Eliminar
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                                    <div><p className="text-xs text-gray-500">Restante</p><p className="font-black text-red-500">{formatCOP(debt.remainingAmount)}</p></div>
+                                                    <div><p className="text-xs text-gray-500">Original</p><p className="font-bold text-gray-700 dark:text-gray-300">{formatCOP(debt.totalAmount)}</p></div>
+                                                    <div><p className="text-xs text-gray-500">Interés/mes</p><p className="font-bold text-orange-500">{formatCOP(mInterest)}</p></div>
+                                                    <div><p className="text-xs text-gray-500">Meses restantes</p><p className="font-bold text-violet-500">{isPaid ? '—' : `~${monthsLeft}`}</p></div>
+                                                </div>
+
+                                                {/* Barra de progreso */}
+                                                <div className="mb-2">
+                                                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                        <span>Progreso</span><span className="font-bold text-emerald-500">{prog.toFixed(1)}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-3">
+                                                        <div className="h-3 rounded-full transition-all" style={{ width: `${prog}%`, background: prog >= 75 ? '#10b981' : prog >= 40 ? '#f59e0b' : '#ef4444' }} />
+                                                    </div>
+                                                </div>
+
+                                                {!isPaid && (
+                                                    <p className="text-xs text-orange-600 dark:text-orange-400">⚠️ Cada mes se generan <strong>{formatCOP(mInterest)}</strong> de interés</p>
+                                                )}
+                                                {isPaid && debt.endDate && (
+                                                    <p className="text-xs text-emerald-600 font-semibold">🎉 Pagada el {new Date(debt.endDate).toLocaleDateString('es-CO')}</p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex md:flex-col gap-2 shrink-0">
+                                                {!isPaid && (
+                                                    <button onClick={() => { setPayModal(debt); setPayAmount('') }}
+                                                        className="flex-1 md:flex-none px-4 py-2 rounded-xl font-bold text-white text-sm"
+                                                        style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+                                                        💵 Pagar
                                                     </button>
-                                                </div>
+                                                )}
+                                                <button onClick={() => del(debt.id)}
+                                                    className="flex-1 md:flex-none px-4 py-2 rounded-xl font-bold text-red-500 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-sm transition">
+                                                    🗑️
+                                                </button>
                                             </div>
                                         </div>
-                                    )
-                                })}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {/* Tab: Estrategias IA */}
+                    {tab === 'strategies' && analysis && (
+                        <div className="space-y-5">
+                            {/* Resumen */}
+                            <div className={card}>
+                                <h2 className="font-bold text-gray-900 dark:text-white mb-4">📊 Tu Situación de Deudas</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {[
+                                        { label: 'Deuda total activa', value: formatCOP(analysis.summary?.totalDebt || 0), color: 'text-red-500' },
+                                        { label: 'Interés mensual total', value: formatCOP(analysis.summary?.totalMonthlyInterest || 0), color: 'text-orange-500' },
+                                        { label: 'Excedente mensual', value: formatCOP(analysis.summary?.monthlyFreeAmount || 0), color: 'text-emerald-500' },
+                                    ].map(k => (
+                                        <div key={k.label} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                                            <p className="text-xs text-gray-500 mb-1">{k.label}</p>
+                                            <p className={`font-black text-lg ${k.color}`}>{k.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        )}
-                    </div>
 
-                    {/* Modal de Pago */}
-                    {showPaymentModal && selectedDebt && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-                                <h3 className="text-2xl font-bold mb-4">💵 Registrar Pago</h3>
-                                <p className="text-gray-600 mb-4">
-                                    Deuda: <span className="font-bold">{selectedDebt.description}</span>
-                                </p>
-                                <p className="text-gray-600 mb-4">
-                                    Saldo actual: <span className="font-bold text-red-600">{formatCOP(selectedDebt.remainingAmount)}</span>
-                                </p>
+                            {/* Estrategias */}
+                            {analysis.strategies && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {Object.entries(analysis.strategies).map(([key, s]: [string, any]) => {
+                                        const isRecommended = analysis.recommended === key
+                                        return (
+                                            <div key={key} className={`${card} ${isRecommended ? 'ring-2 ring-emerald-500' : ''}`}>
+                                                {isRecommended && (
+                                                    <div className="inline-block px-3 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full mb-3">🏆 Recomendada por IA</div>
+                                                )}
+                                                <h3 className="font-black text-gray-900 dark:text-white text-lg mb-1">
+                                                    {key === 'avalanche' ? '🌊 Avalancha' : '⛄ Bola de Nieve'}
+                                                </h3>
+                                                <p className="text-sm text-gray-500 mb-4">{s.description}</p>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-sm"><span className="text-gray-500">Meses para liberarte</span><span className="font-bold text-gray-900 dark:text-white">{s.months} meses</span></div>
+                                                    <div className="flex justify-between text-sm"><span className="text-gray-500">Total en intereses</span><span className="font-bold text-red-500">{formatCOP(s.totalInterest)}</span></div>
+                                                    {s.savings > 0 && (
+                                                        <div className="flex justify-between text-sm"><span className="text-gray-500">Ahorras vs la otra</span><span className="font-bold text-emerald-500">+{formatCOP(s.savings)}</span></div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
 
-                                <div className="mb-6">
-                                    <label className="block text-sm font-medium mb-2">Monto del Pago</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={paymentAmount}
-                                        onChange={(e) => setPaymentAmount(e.target.value)}
-                                        className="w-full p-3 border rounded-lg"
-                                        placeholder="Ingresa el monto"
-                                    />
-                                    <div className="flex gap-2 mt-2">
-                                        <button
-                                            onClick={() => setPaymentAmount(calculateMonthlyPayment(selectedDebt).toString())}
-                                            className="text-sm px-3 py-1 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200"
-                                        >
-                                            Pago sugerido (5%)
-                                        </button>
-                                        <button
-                                            onClick={() => setPaymentAmount(selectedDebt.remainingAmount.toString())}
-                                            className="text-sm px-3 py-1 bg-green-100 text-green-600 rounded hover:bg-green-200"
-                                        >
-                                            Pagar todo
-                                        </button>
+                            {/* Recomendaciones IA */}
+                            {analysis.recommendations?.length > 0 && (
+                                <div className={card}>
+                                    <h2 className="font-bold text-gray-900 dark:text-white mb-4">🤖 Recomendaciones IA</h2>
+                                    <div className="space-y-2">
+                                        {analysis.recommendations.map((r: string, i: number) => (
+                                            <div key={i} className="flex gap-2 text-sm text-gray-700 dark:text-gray-300 p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl">
+                                                <span className="text-emerald-500 shrink-0">💡</span> {r}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
+                            )}
 
-                                <div className="flex gap-4">
-                                    <button
-                                        onClick={handlePayment}
-                                        className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-lg hover:shadow-lg transition-all font-semibold"
-                                    >
-                                        Confirmar Pago
+                            {/* Pago sugerido */}
+                            {analysis.summary?.extraPaymentSuggested > 0 && (
+                                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-5 rounded-2xl">
+                                    <p className="text-sm opacity-80 mb-1">Pago extra sugerido por mes (30% de tu excedente)</p>
+                                    <p className="text-3xl font-black">{formatCOP(analysis.summary.extraPaymentSuggested)}</p>
+                                    <p className="text-sm opacity-80 mt-2">Aplicar este monto extra acelera significativamente tu libertad de deudas</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Modal de pago */}
+                    {payModal && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50" onClick={() => setPayModal(null)}>
+                            <div className={`${card} max-w-md w-full`} onClick={e => e.stopPropagation()}>
+                                <h3 className="font-black text-gray-900 dark:text-white text-xl mb-1">💵 Registrar Pago</h3>
+                                <p className="text-gray-500 text-sm mb-4">{payModal.description} · Saldo: <strong className="text-red-500">{formatCOP(payModal.remainingAmount)}</strong></p>
+                                <input type="number" step="1000" placeholder="Monto del pago" value={payAmount}
+                                    onChange={e => setPayAmount(e.target.value)}
+                                    className="w-full p-3 border rounded-xl dark:bg-gray-800 dark:border-white/10 mb-3" />
+                                <div className="flex gap-2 mb-4">
+                                    <button onClick={() => setPayAmount(String(Math.round(payModal.remainingAmount * 0.05)))}
+                                        className="text-xs px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg font-semibold">
+                                        Mínimo (5%)
                                     </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowPaymentModal(false)
-                                            setSelectedDebt(null)
-                                            setPaymentAmount('')
-                                        }}
-                                        className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-all font-semibold"
-                                    >
-                                        Cancelar
+                                    <button onClick={() => setPayAmount(String(payModal.remainingAmount))}
+                                        className="text-xs px-3 py-1.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg font-semibold">
+                                        Pagar todo
                                     </button>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={pay} className="flex-1 py-3 rounded-xl font-bold text-white" style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>Confirmar</button>
+                                    <button onClick={() => setPayModal(null)} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">Cancelar</button>
                                 </div>
                             </div>
                         </div>
