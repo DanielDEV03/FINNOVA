@@ -19,6 +19,7 @@ public interface IApplicationDbContext
     DbSet<Account> Accounts { get; }
     DbSet<TeamMember> TeamMembers { get; }
     DbSet<ApiKey> ApiKeys { get; }
+    DbSet<Budget> Budgets { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -24,6 +24,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<Budget> Budgets => Set<Budget>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -219,6 +220,18 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(e => e.Scopes).HasColumnType("text[]");
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.KeyHash).IsUnique();
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Budget>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Category).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.LimitAmount).HasPrecision(18, 2);
+            entity.HasIndex(e => new { e.UserId, e.Category, e.Month, e.Year }).IsUnique();
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)

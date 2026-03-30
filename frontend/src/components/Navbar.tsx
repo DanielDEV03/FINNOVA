@@ -12,6 +12,7 @@ import { getPlanLabel } from '@/lib/subscription'
 const NAV_LINKS = [
     { href: '/dashboard', label: 'Dashboard', id: undefined },
     { href: '/transactions', label: 'Transacciones', id: 'nav-transactions' },
+    { href: '/budgets', label: 'Presupuestos', id: undefined },
     { href: '/analysis', label: 'Análisis', id: 'nav-analysis' },
     { href: '/predictions', label: 'Predicciones IA', id: 'nav-predictions' },
     { href: '/debts', label: 'Deudas', id: undefined },

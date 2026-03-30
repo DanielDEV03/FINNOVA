@@ -28,6 +28,25 @@ interface DashboardData {
     recentTransactions: any[]
 }
 
+interface BudgetSummary {
+    totalBudgets: number
+    exceeded: number
+    warning: number
+    totalBudgeted: number
+    totalSpent: number
+    overallPercentage: number
+}
+
+interface BudgetItem {
+    id: string
+    category: string
+    limitAmount: number
+    spent: number
+    remaining: number
+    percentage: number
+    status: 'ok' | 'warning' | 'exceeded'
+}
+
 interface Alert {
     type: string
     severity: string
@@ -58,19 +77,20 @@ export default function Dashboard() {
     const [data, setData] = useState<DashboardData | null>(null)
     const [alerts, setAlerts] = useState<Alerts | null>(null)
     const [dailyBudget, setDailyBudget] = useState<DailyBudget | null>(null)
+    const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null)
+    const [budgetItems, setBudgetItems] = useState<BudgetItem[]>([])
     const { startTour } = useAppTour()
-    const { canExportPDF, isPro } = usePlan()
-    const [userId, setUserId] = useState<string>('')
+    const { canExportPDF } = usePlan()
     const [showAllAlerts, setShowAllAlerts] = useState(false)
     const [newAchievement, setNewAchievement] = useState<any>(null)
 
     useEffect(() => {
         const id = localStorage.getItem('userId')
         if (id) {
-            setUserId(id)
             loadDashboard(id)
             loadAlerts(id)
             loadDailyBudget(id)
+            loadBudgets(id)
         }
 
         // Lanzar tour si viene del onboarding
@@ -104,6 +124,20 @@ export default function Dashboard() {
             setDailyBudget(response.data)
         } catch (error) {
             console.error('Error loading daily budget:', error)
+        }
+    }
+
+    const loadBudgets = async (id: string) => {
+        try {
+            const now = new Date()
+            const [summary, detail] = await Promise.all([
+                api.get(`/users/${id}/budgets/summary`),
+                api.get(`/users/${id}/budgets?month=${now.getMonth() + 1}&year=${now.getFullYear()}`)
+            ])
+            setBudgetSummary(summary.data)
+            setBudgetItems(detail.data?.budgets?.slice(0, 4) || [])
+        } catch (error) {
+            console.error('Error loading budgets:', error)
         }
     }
 
@@ -324,6 +358,55 @@ export default function Dashboard() {
                             <p className="text-sm sm:text-base font-semibold text-gray-900">Análisis</p>
                         </Link>
                     </div>
+
+                    {/* WIDGET PRESUPUESTOS */}
+                    {budgetSummary && budgetSummary.totalBudgets > 0 && (
+                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-5 mb-6 md:mb-8 border border-gray-100 dark:border-white/5">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">🎯 Presupuestos del Mes</h2>
+                                <Link href="/budgets" className="text-sm text-emerald-600 dark:text-emerald-400 font-medium hover:underline">
+                                    Ver todos →
+                                </Link>
+                            </div>
+
+                            {/* Barra global */}
+                            <div className="mb-4">
+                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>{formatCOP(budgetSummary.totalSpent)} gastado</span>
+                                    <span>{formatCOP(budgetSummary.totalBudgeted)} presupuestado ({budgetSummary.overallPercentage}%)</span>
+                                </div>
+                                <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5">
+                                    <div className="h-2.5 rounded-full transition-all duration-700"
+                                        style={{
+                                            width: `${Math.min(100, budgetSummary.overallPercentage)}%`,
+                                            background: budgetSummary.overallPercentage >= 100 ? '#ef4444' : budgetSummary.overallPercentage >= 80 ? '#f59e0b' : '#10b981'
+                                        }} />
+                                </div>
+                                {budgetSummary.exceeded > 0 && (
+                                    <p className="text-xs text-red-500 mt-1">⚠️ {budgetSummary.exceeded} categoría(s) excedida(s)</p>
+                                )}
+                            </div>
+
+                            {/* Top categorías */}
+                            <div className="space-y-2">
+                                {budgetItems.map((b) => (
+                                    <div key={b.id} className="flex items-center gap-3">
+                                        <span className="text-xs text-gray-600 dark:text-gray-400 w-28 truncate shrink-0">{b.category}</span>
+                                        <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                                            <div className="h-2 rounded-full transition-all duration-500"
+                                                style={{
+                                                    width: `${Math.min(100, b.percentage)}%`,
+                                                    background: b.status === 'exceeded' ? '#ef4444' : b.status === 'warning' ? '#f59e0b' : '#10b981'
+                                                }} />
+                                        </div>
+                                        <span className={`text-xs font-semibold w-10 text-right shrink-0 ${b.status === 'exceeded' ? 'text-red-500' : b.status === 'warning' ? 'text-yellow-500' : 'text-emerald-500'}`}>
+                                            {b.percentage}%
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* TRANSACCIONES RECIENTES */}
                     {data.recentTransactions && data.recentTransactions.length > 0 && (

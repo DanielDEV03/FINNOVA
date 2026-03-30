@@ -452,6 +452,29 @@ static async Task ApplyCustomMigrationsAsync(ApplicationDbContext db)
         ";
         await cmd.ExecuteNonQueryAsync();
         Console.WriteLine("✓ Business features migration applied (Accounts, TeamMembers, ApiKeys)");
+
+        // Migración: Budgets
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS ""Budgets"" (
+                ""Id"" uuid NOT NULL,
+                ""UserId"" uuid NOT NULL,
+                ""Category"" character varying(100) NOT NULL,
+                ""LimitAmount"" numeric(18,2) NOT NULL,
+                ""Month"" integer NOT NULL,
+                ""Year"" integer NOT NULL,
+                ""AlertAt80"" boolean NOT NULL DEFAULT true,
+                ""AlertAt100"" boolean NOT NULL DEFAULT true,
+                ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT now(),
+                ""UpdatedAt"" timestamp with time zone,
+                CONSTRAINT ""PK_Budgets"" PRIMARY KEY (""Id""),
+                CONSTRAINT ""FK_Budgets_Users_UserId"" FOREIGN KEY (""UserId"")
+                    REFERENCES ""Users"" (""Id"") ON DELETE CASCADE,
+                CONSTRAINT ""UQ_Budgets_User_Category_Month_Year"" UNIQUE (""UserId"", ""Category"", ""Month"", ""Year"")
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_Budgets_UserId"" ON ""Budgets""(""UserId"");
+        ";
+        await cmd.ExecuteNonQueryAsync();
+        Console.WriteLine("✓ Budgets migration applied");
     }
     catch (Exception ex)
     {
